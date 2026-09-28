@@ -67,3 +67,4 @@ Anything longer goes into a file, and the summary points to it. The main thread 
 - Fanning out over tasks with unmet dependencies, then merging the conflicts.
 - Using the deep tier by default "to be safe". Its cost belongs where judgment is the bottleneck.
 - A persona or subagent that orchestrates other subagents.
+- Subagents writing compound shell scripts (variables, `$(…)`, chained `cd … &&`, `rm -rf`). Permission checks can't read them, so each one stops the user with a prompt. Give subagents one plain command per call and the file tools, and hand anything permission-gated back to the main thread (`needs-command`).

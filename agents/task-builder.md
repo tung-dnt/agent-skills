@@ -24,6 +24,12 @@ The orchestrator gives you: the story id, the task id, the worktree path, the pa
 
 ## Rules
 
+**Commands that never need a permission prompt.** You run unattended, so every prompt stops the user. Permission checks can only approve commands they can read:
+- **One plain command per shell call.** No multi-line scripts, `set -e`, shell variables (`X=…; "$X"`), `$(…)`, `&&` chains, or `cd dir && …`. Use absolute literal paths, or the tool's working directory.
+- **Use the file tools** (Read, Write, Edit, Glob, Grep) instead of `cat`, `cp`, `mkdir`, `sed`, or `echo >` wherever a tool does the job.
+- **Never delete recursively** (`rm -r`, `rm -rf`, `rmdir`). For a scratch location, use a new directory with a unique name rather than wiping an old one. Scratch space is disposable, and the orchestrator cleans up.
+- **Never run commands that always ask:** `git push`, `ssh`, `docker run`, `docker exec`, `psql`, `kubectl`, `terraform`, any `publish`, or `rm -r`. When the task needs one, for example tests that only run in a container or a local database check, stop and report `needs-command` with the exact command, its working directory, and why. The orchestrator runs it once in the main session and sends you back with the output.
+
 - Never claim, release, or pick tasks, and never edit the plan or another task's file. The orchestrator owns those.
 - Never spawn subagents.
 - Stop and report `blocked` instead of guessing when the design note doesn't hold, a decision isn't covered by the approved note, or the change is irreversible (auth, data migrations, deletions, secrets). You can't ask the user yourself.
@@ -32,7 +38,7 @@ The orchestrator gives you: the story id, the task id, the worktree path, the pa
 ## Report (at most 15 lines)
 
 ```
-status: done | blocked | failed
+status: done | blocked | failed | needs-command
 task: <story-id>/<task-id>
 summary: <one or two sentences>
 evidence: <tests run and result>, commit <sha>
