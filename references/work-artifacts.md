@@ -26,7 +26,7 @@ When `configured=false`, **propose** a location to the user, using the notes (fo
 
 ## Scopes and Commands
 
-Every piece of work belongs to one scope, and each scope has one entry command. The command checks that the request fits its scope before it writes anything. Wrong-scope work is the most expensive mistake in the pipeline: an epic treated as a task skips design, and a task treated as an epic buries a one-line fix in process.
+Every piece of work belongs to one scope, and each scope has one entry command. Every gate in these commands is the approval gate in `approval-gate.md`: a catch-up summary, `grill-me` rounds, and an explicit go-ahead before anything downstream starts. The command checks that the request fits its scope before it writes anything. Wrong-scope work is the most expensive mistake in the pipeline: an epic treated as a task skips design, and a task treated as an epic buries a one-line fix in process.
 
 | Scope | Command | Owns | Hands off to |
 |---|---|---|---|
@@ -107,6 +107,9 @@ owner:                   # set on claim: branch or session name
 
 ## Design
 <!-- low-level-design note, added just before implementation -->
+
+## Summary
+<!-- catch-up summary from the task's approval gate (approval-gate.md) -->
 
 ## Subtasks
 <!-- optional checklist the owner ticks while building, e.g. - [ ] adapter  - [x] schema -->

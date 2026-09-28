@@ -1,7 +1,7 @@
 description = "Take one story from requirements to an approved design and task plan, resuming at its current phase"
 
 prompt = """
-Work at story scope: one user-facing capability that needs several tasks, or tasks that share a contract. Every step ends at a human gate.
+Work at story scope: one user-facing capability that needs several tasks, or tasks that share a contract. Steps 1–3 each end at the approval gate (`references/approval-gate.md` in the plugin): write and show the catch-up summary, run the grill-me skill rounds over the open decisions (always at least one question), and wait for the user's explicit go-ahead. Save the summary to `docs/stories/[story-id]/summary.md`, overwriting it at each gate. Never start the next step before the go-ahead.
 
 ## Before anything else
 
@@ -14,7 +14,7 @@ Pick the story id (a tracker key in lowercase, or a kebab-case slug), then run `
 ## Steps
 
 1. Spec (phase `none` or `spec`). Invoke the spec-driven-development skill and write `docs/stories/[story-id]/spec.md` with numbered functional requirements (`FR1`…) whose acceptance criteria can be tested, and non-functional requirements (`NFR1`…) as targets, drawing on `CONSTRAINTS.md` when it exists. When the story belongs to an epic, put `epic: [epic-id]` in its frontmatter and don't restate the epic.
-2. Design (phase `design`). Invoke the high-level-design skill and add a `## Design` section to the spec: scope and out of scope, components, flows labelled sync/async, data ownership, how each NFR is met and verified, security, rollout, and shared contracts with ids (`C1`…) and concrete examples. Compare at least two options for decisions that are hard to reverse and record ADRs. Run the fresh-context critique it calls for, then get the user's approval.
-3. Plan (phase `plan`). Invoke the planning-and-task-breakdown skill: write `docs/stories/[story-id]/plan.md` (a task index with dependencies and design refs, carrying the same `epic:` in its frontmatter), and one task file per task under `tasks/`, each with `status: pending`. After approval, commit the spec, plan, and task files so every worktree and machine can see them.
+2. Design (phase `design`). Invoke the high-level-design skill and add a `## Design` section to the spec: scope and out of scope, components, flows labelled sync/async, data ownership, how each NFR is met and verified, security, rollout, and shared contracts with ids (`C1`…) and concrete examples. Compare at least two options for decisions that are hard to reverse and record ADRs. Run the fresh-context critique it calls for, then the approval gate.
+3. Plan (phase `plan`). Invoke the planning-and-task-breakdown skill: write `docs/stories/[story-id]/plan.md` (a task index with dependencies and design refs, carrying the same `epic:` in its frontmatter), and one task file per task under `tasks/`, each with `status: pending`. After the approval gate, commit the spec, plan, and task files so every worktree and machine can see them.
 4. Hand off (phase `build` or `done`). Show `bash [agent-skills plugin root]/hooks/work-state.sh status [story-id]` and end with the exact next command: `/task [story-id]` to build one task, or `/build auto` to build all of them in parallel. At phase `done`, recommend a whole-story review with the code-review-and-quality skill, then the shipping-and-launch skill.
 """

@@ -1,5 +1,5 @@
 ---
-description: Build one task end to end — claim, low-level design, test-first build, review, commit, release
+description: Build one task — claim, design note, your approval (catch-up summary + grill-me), then subagents build and review before commit and release
 ---
 
 Work at **task scope**: one change that fits a focused session and touches no shared contract. Subtasks are the `## Subtasks` checkboxes inside the task file.
@@ -18,10 +18,19 @@ Work at **task scope**: one change that fits a focused session and touches no sh
 
 ## Steps
 
+You are the orchestrator. Only you talk to the user; subagents investigate, design, build, and review, and each returns a report of 15 lines or fewer (`references/model-routing.md`). Read their reports, not their diffs, so this context stays small.
+
 1. **Claim.** Unless you claimed this task earlier in this conversation, or the user just adopted it through /resume, run `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" claim [story-id] [task-id] [work-branch]`. Exit 3 means another session holds it: choose another task or stop. Exit 5 means the claim couldn't be published: stop and report. For a worktree per task, create the worktree only after the claim succeeds. Set `status: claimed` and `owner` in the task file.
-2. **Context.** Run `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" brief [story-id] [task-id]` and read only what it points to.
-3. **Low-level design.** If the task's `## Design` section is empty and the task has business rules, external calls, or concurrency, invoke agent-skills:low-level-design. If the task needs to change a shared contract, stop: that change belongs to `/story [story-id]`.
-4. **Build test-first** with agent-skills:test-driven-development and agent-skills:incremental-implementation. Tick `## Subtasks` as you go.
-5. **Review.** Invoke agent-skills:code-review-and-quality on the diff, checking it against the design note. Also use the security-auditor persona when the task touches authentication, permissions, payments, secrets, or personal data. Fix Critical and Important findings.
-6. **Finish.** Set `status: done`, add a `## Log` line, and commit only this task's paths: `git commit -- <task file> <code paths>`. Release the lock with `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" release [story-id] [task-id]` once `done` is on the base branch: right away if you committed on the base branch, otherwise after your work branch is merged. A lock released before the merge lets another session take the task again. If you stop early for any reason, still write a Log line saying what's done and what's next.
-7. **Report** the result and the next command: `/task [story-id]` for the next task, or `/story [story-id]` when the story reaches phase `done`.
+2. **Context.** Run `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" brief [story-id] [task-id]`. That is the whole context the subagents need; pass them paths, not content.
+3. **Investigate** (bugs and unknown causes only). Spawn a read-only `Explore` subagent on the fast tier (`model: haiku`), or `sonnet` when reproducing needs a browser or running the app. It separates the observed symptom from the inferred cause, ranks hypotheses by evidence, and reports the one credible mechanism or the exact blocker. It never edits.
+4. **Draft the design note.** If the task file's `## Design` is empty, spawn a general-purpose subagent on the balanced tier (`model: sonnet`). It follows agent-skills:low-level-design, writes the note into `## Design`, and returns it. Give it the story id, task id, and the investigation report. If the note needs a change to a shared contract, stop: that belongs to `/story [story-id]`.
+5. **Approval gate** (`references/approval-gate.md` in the plugin), in this thread:
+   - write the catch-up summary into the task file's `## Summary` and show it (Business context · Proposed fix fit · Root cause for bugs · Recommendation · Open decisions)
+   - run agent-skills:grill-me over the open decisions, always asking at least "Proceed with this design?"
+   - wait for the user's explicit go-ahead. When an answer changes the design, update the note and the summary and ask again. **Nothing is built before the go-ahead.**
+6. **Build.** Spawn the `agent-skills:task-builder` subagent with the story id, task id, checkout or worktree path, the `work-state.sh` path, and the test command. If it reports `blocked`, put the named decision to the user through the gate, then send the builder back. If it fails twice, run it once more on the main thread's model with a summary of both failures. If it still fails, stop and ask.
+7. **Review.** Spawn `agent-skills:code-reviewer` on the task's diff, checking it against the approved note. Also spawn `agent-skills:security-auditor` when the task touches authentication, permissions, payments, secrets, or personal data; launch both back-to-back. Send Critical and Important findings to a new builder run.
+8. **Finish.** Check that the task file says `status: done` with a `## Log` line, and that the commit holds only this task's paths (`git commit -- <task file> <code paths>`). Release the lock with `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" release [story-id] [task-id]` once `done` is on the base branch: right away if the commit is on the base branch, otherwise after the work branch is merged. A lock released before the merge lets another session take the task again. If you stop early for any reason, still write a Log line saying what's done and what's next.
+9. **Report** in a few lines: what changed, the evidence (tests, commit), and the next command: `/task [story-id]` for the next task, or `/story [story-id]` when the story reaches phase `done`.
+
+Without subagents (another host), do steps 3, 4, 6, and 7 yourself in order. The approval gate stays the same.

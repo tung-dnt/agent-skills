@@ -16,4 +16,4 @@ Then generate a structured spec covering all six core areas: objective, commands
 
 If the request bundles several independently testable capabilities, first propose a capability map (module ids, dependency direction, build order) per the skill's Phase 0 and get it approved, then spec each module in dependency order.
 
-Save a spec for the whole project as SPEC.md in the project root. Save a spec for one story or feature as docs/stories/[story-id]/spec.md, where the story id is a tracker key or a short kebab-case slug (ask if unclear). Confirm with the user before proceeding.
+Save a spec for the whole project as SPEC.md in the project root. Save a spec for one story or feature as docs/stories/[story-id]/spec.md, where the story id is a tracker key or a short kebab-case slug (ask if unclear). Then pass the approval gate (`references/approval-gate.md` in the plugin): write and show the catch-up summary, run agent-skills:grill-me rounds over the open decisions (always at least one question), and wait for the user's explicit go-ahead before anything else happens. For a story, save the summary to `docs/stories/[story-id]/summary.md`.

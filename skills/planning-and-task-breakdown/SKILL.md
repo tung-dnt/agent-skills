@@ -125,6 +125,8 @@ Add each checkpoint to the task list target as a task of its own, depending on t
 - [ ] Review with human before proceeding
 ```
 
+Before any task is built, the plan passes the approval gate (`../../references/approval-gate.md`): a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead.
+
 ## Task Sizing Guidelines
 
 | Size | Files | Scope | Example |
@@ -164,7 +166,7 @@ The same rule applies to an external task list target: never bulk-close or delet
 
 The task list target is where tasks and checkpoints are recorded. It is defined once, here; every other reference in this skill defers to it.
 
-- **Default: one file per task** at `docs/stories/[story-id]/tasks/[task-id].md`, created with `status: pending`: the frontmatter below, then the Step 4 structure, then empty `## Design`, `## Subtasks`, and `## Log` sections. One file per task means parallel sessions never write the same file. This is the convention the `/build` command expects; `../../references/work-artifacts.md` has the full lifecycle and claim protocol.
+- **Default: one file per task** at `docs/stories/[story-id]/tasks/[task-id].md`, created with `status: pending`: the frontmatter below, then the Step 4 structure, then empty `## Design`, `## Summary`, `## Subtasks`, and `## Log` sections. One file per task means parallel sessions never write the same file. This is the convention the `/build` command expects; `../../references/work-artifacts.md` has the full lifecycle and claim protocol.
   ```
   ---
   id: t02-apply-event
@@ -255,7 +257,7 @@ Before starting implementation, confirm:
 - [ ] No pre-existing incomplete plan was overwritten without explicit user confirmation
 - [ ] No task touches more than ~5 files
 - [ ] Checkpoints exist between major phases
-- [ ] The human has reviewed and approved the plan
+- [ ] The plan passed the approval gate: summary shown, `grill-me` frontier empty, explicit go-ahead
 
 ## See Also
 

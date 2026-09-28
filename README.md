@@ -35,7 +35,7 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 |-------------------|---------|---------------|
 | Plan an epic or a new project | `/epic` | Intent, requirements, architecture, story map |
 | Take a story to an approved plan | `/story` | Resumes at its current phase |
-| Build one task end to end | `/task` | Claim → design note → test-first → review |
+| Build one task end to end | `/task` | Claim → design note → your approval → subagents build and review |
 | Stress-test a plan or decision | `/grill-me` | Settle every branch before acting |
 | Define what to build | `/spec` | Spec before code |
 | Plan how to build it | `/plan` | Small, atomic tasks |
@@ -67,6 +67,11 @@ Skills also activate automatically based on what you're doing — designing an A
 | **Task / subtask** | `low-level-design` note → `test-driven-development` → `incremental-implementation` → `code-review-and-quality`, which checks the diff against the note | Design note, tests, one commit per task |
 
 A task that needs to change a shared contract escalates it to the story's design instead of changing it silently.
+
+**Nothing starts without your go-ahead.** Every spec, design, plan, and task passes one approval gate ([references/approval-gate.md](references/approval-gate.md)):
+1. A one-screen **catch-up summary**: Business context · Proposed fix fit · Root cause (bugs) · Recommendation · Open decisions. It is also saved to `docs/stories/[story-id]/summary.md`, or to the task file's `## Summary`.
+2. **`grill-me` rounds** over the open decisions. Every gate asks at least one question.
+3. Your **explicit go-ahead**. `/build auto` holds one gate over the whole plan and every design note, then runs autonomously.
 
 ### Artifacts that are safe for parallel sessions
 
@@ -387,6 +392,7 @@ Quick-reference material that skills pull in when needed:
 | [observability-checklist.md](references/observability-checklist.md) | On-call questions, structured logging, RED/USE metrics, tracing, symptom-based alerting, pre-launch gate |
 | [orchestration-patterns.md](references/orchestration-patterns.md) | Endorsed multi-persona orchestration patterns, anti-patterns, and the "personas don't invoke personas" rule |
 | [work-artifacts.md](references/work-artifacts.md) | Per-story layout, task files, the git-lock claim protocol, root resolution, progress view, and resuming |
+| [approval-gate.md](references/approval-gate.md) | The one gate before work starts: catch-up summary format, `grill-me` rounds, explicit go-ahead, and where each gate sits |
 | [model-routing.md](references/model-routing.md) | Model tiers, what gets delegated at each scope, the subagent output contract, parallel fan-out, and escalation |
 
 ---
@@ -429,7 +435,7 @@ The portable core stays in shared directories. Host-specific paths are native di
 | Layer / consumer | Repository paths | Purpose |
 |---|---|---|
 | Shared workflow core | `skills/` (28 skills) | Portable `SKILL.md` workflows used by every integration |
-| Shared review material | `agents/` (6 agents), `references/` (9 references) | Specialist reviewers, delegated workers, and pack-level references carried by whole-repo installs |
+| Shared review material | `agents/` (6 agents), `references/` (10 references) | Specialist reviewers, delegated workers, and pack-level references carried by whole-repo installs |
 | Claude Code adapter | `.claude/commands/` (14 commands), `.claude-plugin/`, `hooks/` | Slash-command wrappers, marketplace metadata, lifecycle hooks, and `work-state.sh` |
 | Gemini CLI adapter | `.gemini/commands/` (14 commands) | Gemini-native TOML command wrappers |
 | Antigravity CLI adapter | `commands/` (14 commands), `plugin.json` | Legacy TOML wrappers and the root plugin manifest; see the [known wrapper limitation](docs/antigravity-setup.md#lifecycle-workflows-and-command-compatibility) |

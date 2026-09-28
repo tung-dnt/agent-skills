@@ -13,7 +13,7 @@ Read the existing spec (docs/stories/[story-id]/spec.md, SPEC.md, or equivalent)
 3. Slice work vertically (one complete path per task, not horizontal layers)
 4. Write tasks with acceptance criteria and verification steps
 5. Add checkpoints between phases
-6. Present the plan for human review
+6. Pass the approval gate (`references/approval-gate.md` in the plugin): write and show the catch-up summary, run agent-skills:grill-me rounds over the open decisions (always at least one question), and wait for the user's explicit go-ahead. Save the summary to `docs/stories/[story-id]/summary.md`
 
 Save the plan to docs/stories/[story-id]/plan.md and write one file per task under docs/stories/[story-id]/tasks/, each starting with status: pending, as the skill describes. Task status lives only in the task files, never in the plan, so several sessions can build the plan at once. After approval, commit the plan and task files so every worktree and machine sees them before anyone claims a task.
 

@@ -2,7 +2,7 @@
 description: Plan an epic or a new project — interview, requirements, architecture, and a story map, with a scope check first
 ---
 
-Work at **epic scope**: a product, a new system, or a set of capabilities that could ship separately. Every step ends at a human gate; don't start the next step until the user approves the current one.
+Work at **epic scope**: a product, a new system, or a set of capabilities that could ship separately. Every step ends at the approval gate (`references/approval-gate.md` in the plugin): write and show the catch-up summary, run agent-skills:grill-me rounds over the open decisions (always at least one question), and wait for the user's explicit go-ahead. Save the summary to `docs/epics/[epic-id]/summary.md`. Don't start the next step before the go-ahead.
 
 ## Before anything else
 

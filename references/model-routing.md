@@ -8,8 +8,9 @@ This extends `orchestration-patterns.md`; its rules still hold. The user or a sl
 
 1. **The main agent orchestrates.** It keeps decisions, artifact paths, and short summaries. Reading-heavy and well-specified work goes to subagents.
 2. **Artifacts on disk carry the context.** A subagent receives paths (a story id, a task id, a worktree) rather than pasted content. It reads what it needs, writes detail to files (the task's `## Log`, a review file), and returns a short summary.
-3. **Scripts before models.** Deterministic work costs no tokens: `hooks/work-state.sh` resolves paths, picks and claims tasks, renders status, and packs a task's context (`brief`). Never ask a model to do what the script does.
-4. **Route by judgment, escalate on failure.** Start each piece at the cheapest tier that can do it well. If it fails, move up a tier and pass a summary of the failure, never the whole transcript.
+3. **Gates stay in the main thread.** Only the main thread can ask the user. Subagents draft and build; approval happens at the gate (`approval-gate.md`).
+4. **Scripts before models.** Deterministic work costs no tokens: `hooks/work-state.sh` resolves paths, picks and claims tasks, renders status, and packs a task's context (`brief`). Never ask a model to do what the script does.
+5. **Route by judgment, escalate on failure.** Start each piece at the cheapest tier that can do it well. If it fails, move up a tier and pass a summary of the failure, never the whole transcript.
 
 ## Tiers
 

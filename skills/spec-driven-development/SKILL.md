@@ -21,7 +21,7 @@ Write a structured specification before writing any code. The spec is the shared
 
 ## The Gated Workflow
 
-Spec-driven development has four phases, preceded by a scope check (Phase 0) that activates only when one request bundles several independently testable capabilities. Do not advance to the next phase until the current one is validated.
+Spec-driven development has four phases, preceded by a scope check (Phase 0) that activates only when one request bundles several independently testable capabilities. Do not advance to the next phase until the current one is validated. Each validation is the approval gate in `../../references/approval-gate.md`: a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead.
 
 ```
 SPECIFY ──→ PLAN ──→ TASKS ──→ IMPLEMENT

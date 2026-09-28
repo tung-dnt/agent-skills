@@ -105,7 +105,7 @@ Compare at least two viable designs for the decisions that are expensive to reve
 
 ### Step 12: Doubt, then human approval
 
-Run the design through `doubt-driven-development` with the spec as the contract, on the deep tier (the main thread's model), in a fresh context: a fresh-context reviewer looks for requirements with no design element, NFRs with no mechanism, and failure paths nobody owns. Fold the findings back in, then present the design for human approval. Tasks are planned only against an approved design.
+Run the design through `doubt-driven-development` with the spec as the contract, on the deep tier (the main thread's model), in a fresh context: a fresh-context reviewer looks for requirements with no design element, NFRs with no mechanism, and failure paths nobody owns. Fold the findings back in, then pass the approval gate (`../../references/approval-gate.md`): a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead. Tasks are planned only against an approved design.
 
 ## Output
 

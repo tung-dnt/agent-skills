@@ -184,7 +184,7 @@ Three commands give each scope its own workflow, so the agent never has to guess
 - `/story [story-id]`: spec with `FR`/`NFR` ids → high-level design with shared contracts → task plan. It resumes at the story's current phase (`work-state.sh phase`).
 - `/task [story-id/task-id | story-id | description]`: claim → low-level design note → test-first build → review → commit → release. A small change with no story gets a one-task story of its own.
 
-Each command checks the scope first. If the request belongs to another scope, it says so and recommends the right command before writing anything.
+Each command checks the scope first. If the request belongs to another scope, it says so and recommends the right command before writing anything. Every spec, design, plan, and task then passes the approval gate ([references/approval-gate.md](../references/approval-gate.md)): a catch-up summary, `grill-me` rounds over the open decisions, and your explicit go-ahead before any work starts. `/task` keeps the main session to that gate and delegates investigation, the design draft, building, and review to subagents on cheaper models.
 
 ### Working across sessions
 

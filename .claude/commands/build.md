@@ -8,8 +8,8 @@ Invoke the agent-skills:incremental-implementation skill alongside agent-skills:
 
 ## Modes
 
-- **`/build`** — claim and implement the *next* unclaimed task, then stop (careful, one slice at a time).
-- **`/build auto`** — generate the plan if needed, get a single approval, then implement *every* task without stopping between them.
+- **`/build`** — claim the *next* unclaimed task and run the `/task` flow on it, including its approval gate, then stop.
+- **`/build auto`** — generate the plan if needed, draft every design note, pass one approval gate over all of it, then implement *every* task without stopping between them.
 
 `$ARGUMENTS` selects the mode. Treat `auto` (canonical) or `all` as autonomous mode; anything else (or empty) is the default single-task mode. Note: autonomous mode is not faster *per task* — it runs the same test-driven loop — it only removes the human stepping *between* tasks.
 
@@ -22,16 +22,7 @@ Pick and claim a task. Other sessions may be building the same plan, so claim be
 - **Pick:** bring the base branch up to date (`git pull --ff-only`), then run `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" next [story-id]`. It prints the first unclaimed pending task whose dependencies are done here; exit 4 means nothing is claimable, so stop and say so.
 - **Claim:** run `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" claim [story-id] [task-id] [work-branch]`. The work branch defaults to the current branch; for a worktree per task, name a new one. Exit 3 means another session won the race, so pick again. Exit 5 means the claim couldn't be published, so stop and report. Only after the claim succeeds, for a worktree per task, run `git worktree add -b [work-branch] ../[repo]-[task-id]` and work there. Then set `status: claimed` and `owner: [work-branch]` in the task file. A claim is yours only if you made it in this conversation; treat any other claim, even one whose work branch is this checkout, as belonging to another session.
 
-Then:
-
-1. Read the task file: acceptance criteria, `design_refs`, and its `## Design` note. If the note is missing and the task has business rules, external calls, or concurrency, write it first with agent-skills:low-level-design
-2. Load relevant context (existing code, patterns, types)
-3. Write a failing test for the expected behavior (RED)
-4. Implement the minimum code to pass the test (GREEN)
-5. Run the full test suite to check for regressions
-6. Run the build to verify compilation
-7. Set `status: done` in the task file and add one line under its `## Log`. If you stop early for any reason, still add a log line saying what's done and what's next, so /resume can pick it up
-8. Commit only this task's paths, `git commit -- <task file> <code paths>`, because other sessions may share this checkout's index. Then release the lock with `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" release [story-id] [task-id]` once `done` is on the base branch: right away if you committed on the base branch, otherwise after your work branch is merged. Stop
+Then follow the `/task` flow from its step 2 for the claimed task: context → investigation (bugs) → design note drafted by a subagent → **approval gate** (catch-up summary, agent-skills:grill-me, explicit go-ahead) → `agent-skills:task-builder` subagent → review subagents → finish and release → a short report. Nothing is built before the go-ahead.
 
 ## Autonomous: the whole plan (`/build auto`)
 
@@ -40,7 +31,7 @@ Use this once a spec exists and you want to collapse plan + build into one run. 
 1. **Require a spec.** Look only for a spec at a known path: `docs/stories/[story-id]/spec.md`, `SPEC.md` at the repo root, `docs/SPEC.md`, or a file under `spec/`. A README or arbitrary doc does **not** count. If none exists, stop and tell the user to run `/spec` first — do not invent requirements.
 2. **Establish a clean baseline.** Run `git status --porcelain`. If there are uncommitted changes outside the expected planning artifacts (the story's files under `docs/stories/[story-id]/`, `SPEC.md`, `docs/SPEC.md`, `spec/*`, or a legacy `tasks/plan.md` / `tasks/todo.md`), stop and ask the user to commit, stash, or confirm how to handle them. Autonomous per-task commits must not absorb unrelated local work, or the clean-rollback guarantee breaks.
 3. **Plan if needed.** If the story has no `docs/stories/[story-id]/plan.md`, invoke agent-skills:planning-and-task-breakdown to generate it and its task files.
-4. **Single checkpoint.** Present the full plan and wait for an unambiguous affirmative (e.g. "approve", "go", "yes"). Treat hedged responses ("looks reasonable", "I guess") as **not** approved. This is the only human gate — after approval, run autonomously. If you generated the plan, commit `docs/stories/[story-id]/plan.md` and its task files as a single preparatory commit now so it doesn't bleed into the first task's commit.
+4. **One approval gate for the whole run.** For every pending task whose `## Design` is empty, draft the design note first: one balanced-tier (`model: sonnet`) subagent per task following agent-skills:low-level-design, launched back-to-back, each writing only its own task file. Then pass the approval gate (`references/approval-gate.md` in the plugin) once, over the plan **and** every design note: write `docs/stories/[story-id]/summary.md` and show it, run agent-skills:grill-me rounds over the open decisions (always at least "Proceed with all N tasks?"), and wait for an explicit go-ahead. A hedged reply is not a go-ahead. This is the only human gate. After it, run autonomously, and bring any decision a builder reports as `blocked` back to the user. If you generated the plan, commit `docs/stories/[story-id]/plan.md` and its task files as a single preparatory commit now so it doesn't bleed into the first task's commit.
 5. **Execute in waves, as the orchestrator.** Delegate building to subagents and keep only their short reports in this context (`references/model-routing.md` in the plugin). Repeat until `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" next` exits 4 and no builder is running:
    - **Fill the wave:** up to 3 tasks at a time, or the number the user asked for (never more than 5). For each one, run `next`, then `claim [story-id] [task-id] task/[story-id]/[task-id]`, and only after the claim succeeds run `git worktree add -b task/[story-id]/[task-id] ../[repo]-[task-id]`. Exit 3 means another session won, so pick again. Exit 5 means the claim couldn't be published, so stop and report.
    - **Delegate:** spawn one `agent-skills:task-builder` subagent per claimed task, and launch them back-to-back, in one turn where possible, without waiting for results, so they run concurrently. Pass paths, not content: the story id, the task id, the worktree path, the `work-state.sh` path, and the test command.
