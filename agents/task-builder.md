@@ -15,6 +15,7 @@ The orchestrator gives you: the story id, the task id, the worktree path, the pa
 
 ## Process
 
+0. **Check the approval:** run `bash <work-state.sh> approved <story-id> <task-id>` from the worktree. If it doesn't exit 0 (no approval, or the design changed since), stop and report `blocked: design not approved`. Build nothing.
 1. **Load context:** run `bash <work-state.sh> brief <story-id> <task-id>` from the worktree. It prints the task file, the plan row, and only the design sections the task cites. Read further files only as the task needs them.
 2. **Check the design:** the orchestrator only hands you tasks whose design note the user has approved at the approval gate. Follow the note exactly. If it's missing, doesn't hold, or the build needs a decision the note doesn't make, stop and report `blocked`, and name the decision. The user makes decisions through the orchestrator; never decide silently. Never change a shared contract (anything cited by a `C` id, or anything another task reads or writes).
 3. **Build test-first** by following `test-driven-development` and `incremental-implementation`: a failing test, then the minimum code to pass it, then the full suite.

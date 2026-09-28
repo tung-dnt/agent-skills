@@ -14,6 +14,8 @@
 #   work-state.sh status [STORY-ID]           ticked tree: epics → stories → tasks → subtasks
 #   work-state.sh brief STORY TASK            task file + plan row + only the spec sections it cites
 #   work-state.sh phase STORY                 none | spec | design | plan | build | done
+#   work-state.sh approve STORY TASK          record the gate's approval of the task's design
+#   work-state.sh approved STORY TASK         exit 0 approved, 6 not approved, 7 changed since
 #   work-state.sh hint                        SessionStart JSON when claims exist; silent otherwise
 #
 # A claim is the ref refs/heads/claim/STORY/TASK pointing at a unique empty
@@ -235,6 +237,81 @@ cmd_next() {
   exit 4
 }
 
+# ── design approval ──────────────────────────────────────────────────────────
+#
+# The approval gate records `design_approved: <date> <hash>` in the task's
+# frontmatter, where <hash> fingerprints the `## Design` section. Editing the
+# note afterwards changes the hash, so the approval no longer holds.
+
+# The `## Design` section of markdown on stdin, without HTML comments or blank lines.
+design_section() {
+  awk '
+    /^## / { on = ($0 ~ /^## Design[[:space:]]*$/); next }
+    on && /^[[:space:]]*<!--.*-->[[:space:]]*$/ { next }
+    on && /[^[:space:]]/ { sub(/[[:space:]]+$/, ""); print }'
+}
+
+design_hash() { design_section | git hash-object --stdin | cut -c1-12; }
+
+# Path of the freshest writable copy of a task file (see task_content).
+task_path() {
+  local story="$1" id="$2" ref rel work wt
+  rel="$STORIES/$story/tasks/$id.md"
+  ref="$(claim_ref "$story" "$id")"
+  if [ -n "$ref" ]; then
+    work="$(claim_work "$ref")"
+    if [ -n "$work" ]; then
+      wt="$(worktree_of "$work")"
+      if [ -n "$wt" ] && [ -f "$wt/$rel" ]; then echo "$wt/$rel"; return 0; fi
+    fi
+  fi
+  echo "$ROOT/$rel"
+}
+
+# Prints "ok <date>", "missing", or "stale" for a task; exit 0, 6, or 7.
+approval_state() {
+  local story="$1" id="$2" content value want
+  content="$(task_content "$story" "$id" "$(claim_ref "$story" "$id")")"
+  value="$(printf '%s\n' "$content" | fm design_approved)"
+  if [ -z "$value" ]; then echo missing; return 6; fi
+  want="$(printf '%s\n' "$content" | design_hash)"
+  if [ "${value##* }" != "$want" ]; then echo stale; return 7; fi
+  echo "ok ${value%% *}"
+}
+
+cmd_approve() {
+  local story="$1" task="$2" file stamp tmp
+  [ -n "$story" ] && [ -n "$task" ] || die "usage: work-state.sh approve STORY TASK"
+  resolve
+  [ -f "$ROOT/$STORIES/$story/tasks/$task.md" ] || die "no task file $STORIES/$story/tasks/$task.md"
+  file="$(task_path "$story" "$task")"
+  if [ -z "$(design_section < "$file")" ]; then
+    die "the task's ## Design section is empty; write the design note before approving"
+  fi
+  stamp="$(date -u +%Y-%m-%dT%H:%MZ) $(design_hash < "$file")"
+  tmp="$file.tmp.$$"
+  awk -v v="$stamp" '
+    NR == 1 && $0 == "---" { infm = 1; print; next }
+    infm && /^design_approved:/ { print "design_approved: " v; done = 1; next }
+    infm && $0 == "---" { if (!done) print "design_approved: " v; infm = 0 }
+    { print }' "$file" > "$tmp" && mv "$tmp" "$file"
+  echo "approved: $story/$task ($stamp)"
+}
+
+cmd_approved() {
+  local story="$1" task="$2" state rc
+  [ -n "$story" ] && [ -n "$task" ] || die "usage: work-state.sh approved STORY TASK"
+  resolve
+  [ -f "$ROOT/$STORIES/$story/tasks/$task.md" ] || die "no task file $STORIES/$story/tasks/$task.md"
+  set +e; state="$(approval_state "$story" "$task")"; rc=$?; set -e
+  case "$state" in
+    ok*) echo "approved: $story/$task (${state#ok })" ;;
+    missing) echo "not approved: $story/$task has no approved design; run the approval gate" ;;
+    stale) echo "not approved: $story/$task's design changed after approval; run the gate again" ;;
+  esac
+  exit "$rc"
+}
+
 # ── brief: the minimum context one task needs ────────────────────────────────
 
 # Blank-line-separated blocks of FILE that mention ID as a whole word, each
@@ -263,6 +340,7 @@ cmd_brief() {
   content="$(task_content "$story" "$task" "$ref")"
   spec="$ROOT/$STORIES/$story/spec.md"
   plan="$ROOT/$STORIES/$story/plan.md"
+  echo "== approval: $(approval_state "$story" "$task" || true)"
   echo "== task $STORIES/$story/tasks/$task.md"
   printf '%s\n' "$content"
   if [ -f "$plan" ]; then
@@ -342,6 +420,13 @@ task_line() {
   fi
   sub="$(printf '%s\n' "$content" | subtasks)"
   [ -n "$sub" ] && extra="$extra · subtasks $sub"
+  if [ "$status" != done ]; then
+    case "$(approval_state "$story" "$id" || true)" in
+      ok*) extra="$extra · design ✓" ;;
+      stale) extra="$extra · design ✗ (changed since approval)" ;;
+      *) extra="$extra · design ✗" ;;
+    esac
+  fi
   if [ "$mark" = "[~]" ] || [ "$mark" = "[!]" ]; then
     wt=""
     [ -n "${work:-}" ] && wt="$(worktree_of "$work")"
@@ -465,6 +550,8 @@ case "${1:-}" in
   status) shift; cmd_status "${1:-}" ;;
   brief) shift; cmd_brief "${1:-}" "${2:-}" ;;
   phase) shift; cmd_phase "${1:-}" ;;
+  approve) shift; cmd_approve "${1:-}" "${2:-}" ;;
+  approved) shift; cmd_approved "${1:-}" "${2:-}" ;;
   hint) cmd_hint ;;
-  *) die "usage: work-state.sh {root|configure DIR [EPICS_DIR]|next [STORY]|claim STORY TASK [WORK]|release STORY TASK|status [STORY]|brief STORY TASK|phase STORY|hint}" ;;
+  *) die "usage: work-state.sh {root|configure DIR [EPICS_DIR]|next [STORY]|claim STORY TASK [WORK]|release STORY TASK|status [STORY]|brief STORY TASK|phase STORY|approve STORY TASK|approved STORY TASK|hint}" ;;
 esac

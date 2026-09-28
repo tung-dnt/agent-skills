@@ -126,6 +126,37 @@ mkdir -p docs/stories/tiny && printf '# Spec\n- FR1: one change\n' > docs/storie
 task_file tiny t01-change pending
 has "a planned story without a design section is phase build" "$(ws phase tiny)" "phase=build"
 
+echo "design approval"
+new_repo approval
+task_file pay t01-refund pending "" '\n## Design\n<!-- low-level-design note, added just before implementation -->\n\n## Summary\n'
+git add -A && git commit --quiet -m plan
+has "approve refuses an empty design" "$(ws approve pay t01-refund)" "Design section is empty"
+has "unapproved task exits 6" "$(code approved pay t01-refund)" "6"
+has "status marks an unapproved design" "$(ws status pay)" "t01-refund · design ✗"
+has "brief shows missing approval" "$(ws brief pay t01-refund)" "== approval: missing"
+sed -i.bak 's/^<!-- low-level-design note, added just before implementation -->$/- Edge: refund(id, amount)\n- Rules: amount <= remaining/' docs/stories/pay/tasks/t01-refund.md && rm docs/stories/pay/tasks/t01-refund.md.bak
+has "approve records the approval" "$(ws approve pay t01-refund)" "approved: pay/t01-refund"
+has "approval is stored in the frontmatter" "$(sed -n '1,/^---$/p' docs/stories/pay/tasks/t01-refund.md; sed -n 2,9p docs/stories/pay/tasks/t01-refund.md)" "design_approved: "
+has "approved task exits 0" "$(code approved pay t01-refund)" "0"
+has "status marks an approved design" "$(ws status pay)" "t01-refund · design ✓"
+has "brief shows the approval" "$(ws brief pay t01-refund)" "== approval: ok"
+printf -- '- Note: summaries are not part of the design\n' >> docs/stories/pay/tasks/t01-refund.md
+has "editing another section keeps the approval" "$(code approved pay t01-refund)" "0"
+sed -i.bak 's/^- Rules: amount <= remaining$/- Rules: amount <= remaining\n- Failure: provider timeout -> PENDING/' docs/stories/pay/tasks/t01-refund.md && rm docs/stories/pay/tasks/t01-refund.md.bak
+has "editing the design after approval voids it (exit 7)" "$(code approved pay t01-refund)" "7"
+has "status flags a design changed since approval" "$(ws status pay)" "design ✗ (changed since approval)"
+ws approve pay t01-refund >/dev/null
+has "re-approving restores it" "$(code approved pay t01-refund)" "0"
+has "re-approving keeps one approval line" "$(grep -c '^design_approved:' docs/stories/pay/tasks/t01-refund.md)" "1"
+git add -A && git commit --quiet -m approved
+# In worktree mode the approval is read from, and written to, the work branch's worktree.
+task_file pay t02-report pending "" '\n## Design\n- Edge: report()\n'
+git add -A && git commit --quiet -m t02
+git worktree add --quiet -b feat-report "$TMP/wt-report"
+(cd "$TMP/wt-report" && "$BASH_BIN" "$SCRIPT" claim pay t02-report feat-report >/dev/null && "$BASH_BIN" "$SCRIPT" approve pay t02-report >/dev/null)
+has "approval made in the worktree is seen from the main checkout" "$(code approved pay t02-report)" "0"
+lacks "main checkout's copy was not touched" "$(cat docs/stories/pay/tasks/t02-report.md)" "design_approved"
+
 echo "worktrees"
 new_repo wt
 task_file shop t01-cart pending
