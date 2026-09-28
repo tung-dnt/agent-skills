@@ -1,0 +1,27 @@
+---
+description: Build one task end to end — claim, low-level design, test-first build, review, commit, release
+---
+
+Work at **task scope**: one change that fits a focused session and touches no shared contract. Subtasks are the `## Subtasks` checkboxes inside the task file.
+
+## Before anything else
+
+1. **Resolve the artifact root.** From the project, run `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" root`. If it reports `configured=false`, propose a location using its notes, and write the config (`work-state.sh configure <storiesDir>`) only after the user confirms. Wherever this command says `docs/stories` or `docs/epics`, use the resolved directories.
+2. **Read the input.** `$ARGUMENTS` may be free text, a slug, or a tracker key or URL. If it's a tracker item and a tracker tool is available, fetch its summary, description, type, parent, and children as input. The item's type is a hint, never the decider. Without a tracker, the repository's files are the tracker.
+3. **Check the scope** against the signals in the "Scopes and Commands" section of the agent-skills work-artifacts reference (`references/work-artifacts.md` in the plugin). If the request belongs to a different scope, say so in one or two sentences with the evidence, recommend the right command, and continue only if the user confirms.
+
+## Choose the task
+
+- **`[story-id]/[task-id]`:** that task. Run `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" phase [story-id]`. If the story isn't at phase `build`, recommend `/story [story-id]` instead.
+- **`[story-id]`:** the next claimable task: `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" next [story-id]`. Exit 4 means nothing is claimable; say why (all done, claimed, or waiting on dependencies) and stop.
+- **A description with no story:** if the scope check says it's task-sized and touches no shared contract, create a one-task story: `docs/stories/[story-id]/spec.md` (with `[story-id]` a short slug; a few lines of goal and acceptance criteria), `docs/stories/[story-id]/plan.md`, and `tasks/t01-[slug].md` with `status: pending`, then commit them. Otherwise recommend `/story`.
+
+## Steps
+
+1. **Claim.** Unless you claimed this task earlier in this conversation, or the user just adopted it through /resume, run `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" claim [story-id] [task-id] [work-branch]`. Exit 3 means another session holds it: choose another task or stop. Exit 5 means the claim couldn't be published: stop and report. For a worktree per task, create the worktree only after the claim succeeds. Set `status: claimed` and `owner` in the task file.
+2. **Context.** Run `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" brief [story-id] [task-id]` and read only what it points to.
+3. **Low-level design.** If the task's `## Design` section is empty and the task has business rules, external calls, or concurrency, invoke agent-skills:low-level-design. If the task needs to change a shared contract, stop: that change belongs to `/story [story-id]`.
+4. **Build test-first** with agent-skills:test-driven-development and agent-skills:incremental-implementation. Tick `## Subtasks` as you go.
+5. **Review.** Invoke agent-skills:code-review-and-quality on the diff, checking it against the design note. Also use the security-auditor persona when the task touches authentication, permissions, payments, secrets, or personal data. Fix Critical and Important findings.
+6. **Finish.** Set `status: done`, add a `## Log` line, and commit only this task's paths: `git commit -- <task file> <code paths>`. Release the lock with `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" release [story-id] [task-id]` once `done` is on the base branch: right away if you committed on the base branch, otherwise after your work branch is merged. A lock released before the merge lets another session take the task again. If you stop early for any reason, still write a Log line saying what's done and what's next.
+7. **Report** the result and the next command: `/task [story-id]` for the next task, or `/story [story-id]` when the story reaches phase `done`.

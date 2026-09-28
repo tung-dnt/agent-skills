@@ -31,7 +31,7 @@ Then:
 5. Run the full test suite to check for regressions
 6. Run the build to verify compilation
 7. Set `status: done` in the task file and add one line under its `## Log`. If you stop early for any reason, still add a log line saying what's done and what's next, so /resume can pick it up
-8. Commit only this task's paths, `git commit -- <task file> <code paths>`, because other sessions may share this checkout's index. Then release the lock: in the same checkout, run `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" release [story-id] [task-id]` now; with a worktree per task, release it after the work branch is merged. Stop
+8. Commit only this task's paths, `git commit -- <task file> <code paths>`, because other sessions may share this checkout's index. Then release the lock with `bash "${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh" release [story-id] [task-id]` once `done` is on the base branch: right away if you committed on the base branch, otherwise after your work branch is merged. Stop
 
 ## Autonomous: the whole plan (`/build auto`)
 

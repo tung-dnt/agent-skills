@@ -176,6 +176,16 @@ The `/spec` and `/plan` commands create working artifacts: a project-level `SPEC
 - Update them when scope or decisions change.
 - If your repo doesn’t want these files long‑term, delete them before merge or add the folder to `.gitignore` — the workflow doesn’t require them to be permanent.
 
+### Working by scope
+
+Three commands give each scope its own workflow, so the agent never has to guess:
+
+- `/epic [id or idea]`: interview → epic requirements (or `SPEC.md` for a whole product) → quality bar → architecture → a story map with a stub folder per story.
+- `/story [story-id]`: spec with `FR`/`NFR` ids → high-level design with shared contracts → task plan. It resumes at the story's current phase (`work-state.sh phase`).
+- `/task [story-id/task-id | story-id | description]`: claim → low-level design note → test-first build → review → commit → release. A small change with no story gets a one-task story of its own.
+
+Each command checks the scope first. If the request belongs to another scope, it says so and recommends the right command before writing anything.
+
 ### Working across sessions
 
 The same artifacts are the handoff between sessions. For a small task, run the whole lifecycle in one session. For anything non-trivial, a fresh session per phase (spec → plan → build → review) keeps context focused — what carries the work forward is the approved files, not the conversation:

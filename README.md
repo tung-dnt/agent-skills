@@ -29,10 +29,13 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 
 ## Commands
 
-10 slash commands that map to the development lifecycle. Each one activates the right skills automatically.
+13 slash commands that map to the development lifecycle. Each one activates the right skills automatically.
 
 | What you're doing | Command | Key principle |
 |-------------------|---------|---------------|
+| Plan an epic or a new project | `/epic` | Intent, requirements, architecture, story map |
+| Take a story to an approved plan | `/story` | Resumes at its current phase |
+| Build one task end to end | `/task` | Claim → design note → test-first → review |
 | Define what to build | `/spec` | Spec before code |
 | Plan how to build it | `/plan` | Small, atomic tasks |
 | Build incrementally | `/build` | One slice at a time |
@@ -53,6 +56,8 @@ Skills also activate automatically based on what you're doing — designing an A
 ## What this fork adds
 
 ### A workflow for each scope of work
+
+`/epic`, `/story`, and `/task` run these workflows. Each starts with a scope check: if the request belongs to a different scope, it says so and recommends the right command before writing anything. They work with or without a tracker. A ticket key or URL is read as input, and without a tracker the repository's folders are the tracker.
 
 | Scope | Workflow | Produces |
 |---|---|---|
@@ -423,9 +428,9 @@ The portable core stays in shared directories. Host-specific paths are native di
 |---|---|---|
 | Shared workflow core | `skills/` (27 skills) | Portable `SKILL.md` workflows used by every integration |
 | Shared review material | `agents/` (6 agents), `references/` (9 references) | Specialist reviewers, delegated workers, and pack-level references carried by whole-repo installs |
-| Claude Code adapter | `.claude/commands/` (10 commands), `.claude-plugin/`, `hooks/` | Slash-command wrappers, marketplace metadata, lifecycle hooks, and `work-state.sh` |
-| Gemini CLI adapter | `.gemini/commands/` (10 commands) | Gemini-native TOML command wrappers |
-| Antigravity CLI adapter | `commands/` (10 commands), `plugin.json` | Legacy TOML wrappers and the root plugin manifest; see the [known wrapper limitation](docs/antigravity-setup.md#lifecycle-workflows-and-command-compatibility) |
+| Claude Code adapter | `.claude/commands/` (13 commands), `.claude-plugin/`, `hooks/` | Slash-command wrappers, marketplace metadata, lifecycle hooks, and `work-state.sh` |
+| Gemini CLI adapter | `.gemini/commands/` (13 commands) | Gemini-native TOML command wrappers |
+| Antigravity CLI adapter | `commands/` (13 commands), `plugin.json` | Legacy TOML wrappers and the root plugin manifest; see the [known wrapper limitation](docs/antigravity-setup.md#lifecycle-workflows-and-command-compatibility) |
 | Codex adapter | `.codex-plugin/`, `.agents/plugins/` | Codex plugin metadata and marketplace registration; Codex consumes `skills/` directly |
 | GitHub Copilot CLI adapter | `plugin.json` | Root plugin metadata; Copilot CLI discovers `skills/` by convention and does not register the lifecycle wrappers |
 | Contributor tooling | `scripts/` (13 scripts), `evals/` (27 case files), `.github/workflows/` | Validation, routing evals, and CI |

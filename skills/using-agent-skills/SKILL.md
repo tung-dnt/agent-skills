@@ -13,6 +13,8 @@ Agent Skills is a collection of engineering workflow skills organized by develop
 
 When a task arrives, identify the development phase and apply the corresponding skill:
 
+Know the scope already? The entry commands are `/epic` (a product or a set of capabilities), `/story` (one feature: spec → design → plan), and `/task` (one change: claim → design note → test-first build → review). Each one checks the scope before writing anything (`../../references/work-artifacts.md`).
+
 ```
 Task arrives
     │

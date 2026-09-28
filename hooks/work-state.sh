@@ -13,6 +13,7 @@
 #   work-state.sh release STORY TASK          drop the lock (local and remote)
 #   work-state.sh status [STORY-ID]           ticked tree: epics → stories → tasks → subtasks
 #   work-state.sh brief STORY TASK            task file + plan row + only the spec sections it cites
+#   work-state.sh phase STORY                 none | spec | design | plan | build | done
 #   work-state.sh hint                        SessionStart JSON when claims exist; silent otherwise
 #
 # A claim is the ref refs/heads/claim/STORY/TASK pointing at a unique empty
@@ -283,6 +284,36 @@ cmd_brief() {
   return 0
 }
 
+# ── phase: where a story stands ──────────────────────────────────────────────
+
+# none   no story directory yet                     → start with the spec
+# spec   no spec.md                                 → write the spec
+# design no plan yet and spec.md has no "## Design" → high-level design
+# plan   no plan.md, or no task files               → plan the tasks
+# build  some task is not done                      → build the tasks
+# done   every task is done
+# A planned story is past design even without "## Design": small stories skip it.
+cmd_phase() {
+  local story="$1" dir f any=0 open=0 status
+  [ -n "$story" ] || die "usage: work-state.sh phase STORY"
+  resolve
+  dir="$ROOT/$STORIES/$story"
+  if [ ! -d "$dir" ]; then echo "phase=none"; return 0; fi
+  if [ ! -f "$dir/spec.md" ]; then echo "phase=spec"; return 0; fi
+  for f in "$dir"/tasks/*.md; do
+    [ -f "$f" ] || continue
+    any=1
+    status="$(task_content "$story" "$(basename "$f" .md)" "$(claim_ref "$story" "$(basename "$f" .md)")" | fm status)"
+    [ "$status" = done ] || open=$((open + 1))
+  done
+  if [ ! -f "$dir/plan.md" ] || [ "$any" = 0 ]; then
+    if ! grep -q '^## Design[[:space:]]*$' "$dir/spec.md"; then echo "phase=design"; return 0; fi
+    echo "phase=plan"; return 0
+  fi
+  if [ "$open" -gt 0 ]; then echo "phase=build"; echo "open_tasks=$open"; return 0; fi
+  echo "phase=done"
+}
+
 # ── status tree ──────────────────────────────────────────────────────────────
 
 task_line() {
@@ -433,6 +464,7 @@ case "${1:-}" in
   release) shift; cmd_release "${1:-}" "${2:-}" ;;
   status) shift; cmd_status "${1:-}" ;;
   brief) shift; cmd_brief "${1:-}" "${2:-}" ;;
+  phase) shift; cmd_phase "${1:-}" ;;
   hint) cmd_hint ;;
-  *) die "usage: work-state.sh {root|configure DIR [EPICS_DIR]|next [STORY]|claim STORY TASK [WORK]|release STORY TASK|status [STORY]|brief STORY TASK|hint}" ;;
+  *) die "usage: work-state.sh {root|configure DIR [EPICS_DIR]|next [STORY]|claim STORY TASK [WORK]|release STORY TASK|status [STORY]|brief STORY TASK|phase STORY|hint}" ;;
 esac

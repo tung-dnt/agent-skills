@@ -24,6 +24,42 @@ bash [plugin-root]/hooks/work-state.sh root
 
 When `configured=false`, **propose** a location to the user, using the notes (for example "this repo keeps specs in `specs/`; use `specs/stories`?"). Write the config only after they confirm, with `bash [plugin-root]/hooks/work-state.sh configure <storiesDir> [epicsDir]`, and commit it. Never write it silently. After that, every command and session uses the resolved directories wherever this document says `docs/stories` or `docs/epics`.
 
+## Scopes and Commands
+
+Every piece of work belongs to one scope, and each scope has one entry command. The command checks that the request fits its scope before it writes anything. Wrong-scope work is the most expensive mistake in the pipeline: an epic treated as a task skips design, and a task treated as an epic buries a one-line fix in process.
+
+| Scope | Command | Owns | Hands off to |
+|---|---|---|---|
+| Epic / project | `/epic` | `docs/epics/[epic-id]/epic.md` (or `SPEC.md` for a whole product), `CONSTRAINTS.md`, architecture ADRs, story stubs | `/story` |
+| Story | `/story` | `docs/stories/[story-id]/spec.md` with `## Design`, `plan.md`, task files | `/task` or `/build auto` |
+| Task / subtask | `/task` | One task file's `## Design`, `## Subtasks`, `## Log`, and that task's code | The next task |
+
+### Scope check
+
+Decide the scope from these signals, in this order. A tracker's issue type, when one exists, is a hint, never the decider:
+
+| Signal | Epic | Story | Task |
+|---|---|---|---|
+| Repo state | No `SPEC.md` or epic for this area yet | No story folder yet, or its phase is `spec`, `design`, or `plan` | A story with a plan exists, or the change needs no plan |
+| Request shape | A product, a new system, several capabilities | One user-facing capability or feature | One change: a function, an endpoint, a fix, a config |
+| Size | Capabilities that could ship separately | Several tasks, or tasks that share a contract (API, table, status field, event) | One focused session, touches no shared contract |
+| Unknowns | Users, goals, or scope are unclear | Requirements are clear, design isn't | Requirements and design are clear |
+
+If the signals point to a different scope from the command that was run, say so in one or two sentences with the evidence, recommend the right command, and continue only when the user confirms. A bug report belongs at task scope unless the fix changes a shared contract.
+
+### Phase
+
+`work-state.sh phase [story-id]` reports where a story stands, so rerunning a command resumes instead of redoing work:
+
+| Phase | Meaning | Next step |
+|---|---|---|
+| `none` | No story folder | Write the spec |
+| `spec` | Folder without `spec.md` | Write the spec |
+| `design` | Spec without a `## Design` section, and no plan yet | High-level design. A story that already has a plan is past this phase: small stories may skip it. |
+| `plan` | No `plan.md`, or no task files | Plan the tasks |
+| `build` | Some task isn't `done` (`open_tasks=N`) | `/task` or `/build auto` |
+| `done` | Every task is `done` | Review the story as a whole, then ship |
+
 ## Layout
 
 ```
@@ -99,9 +135,9 @@ Before picking, bring the base branch up to date (`git pull --ff-only`) so tasks
 - *Same checkout:* claim with the current branch and build in place. Other sessions share this checkout's git index, so commit only your own paths: `git commit -- <task file> <code paths>`.
 - Set `status: claimed` and `owner: [work-branch]` in the task file. Tick `## Subtasks` and write a `## Log` line as you go, and always before stopping.
 
-**Finishing:** set `status: done` and commit it with the task's code. Release the lock once `done` is visible where the next session will look for it:
-- *Same checkout:* release right after the commit.
-- *Worktree per task:* release after the work branch is merged into the base branch. Until then, `status` shows the task as done but "not yet merged", and `next` doesn't treat it as a finished dependency.
+**Finishing:** set `status: done` and commit it with the task's code. Release the lock once `done` is on the base branch, which is where `next` looks:
+- *Committed on the base branch* (same checkout, no separate branch): release right after the commit.
+- *Committed on a work branch* (a worktree, or a branch in the same checkout): release after that branch is merged into the base branch. A lock released earlier lets another session take the task again. Until then, `status` shows the task as done but "not yet merged", and `next` doesn't treat it as a finished dependency.
 
 **Blocked:** set `status: blocked` with the reason in `## Log` and keep the lock. The task shows as `[!]` until someone unblocks it or explicitly releases it. Releasing a blocked task never deletes its work branch.
 

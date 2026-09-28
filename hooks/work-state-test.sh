@@ -104,6 +104,28 @@ lacks "brief omits unrelated spec text" "$out" "Components: api, worker."
 has "brief includes requirements the task names" "$out" "FR2: customer sees status"
 lacks "brief omits other requirements" "$out" "FR9"
 
+echo "phase"
+new_repo phase
+has "no story directory is phase none" "$(ws phase cart)" "phase=none"
+mkdir -p docs/stories/cart
+has "no spec is phase spec" "$(ws phase cart)" "phase=spec"
+printf '# Spec\n- FR1: add item\n' > docs/stories/cart/spec.md
+has "spec without design is phase design" "$(ws phase cart)" "phase=design"
+printf '\n## Design\nC1: cart API.\n' >> docs/stories/cart/spec.md
+has "design without plan is phase plan" "$(ws phase cart)" "phase=plan"
+printf '# Plan\n' > docs/stories/cart/plan.md
+has "plan without task files is still phase plan" "$(ws phase cart)" "phase=plan"
+task_file cart t01-add pending
+task_file cart t02-remove done
+out=$(ws phase cart)
+has "open tasks are phase build" "$out" "phase=build"
+has "phase build counts open tasks" "$out" "open_tasks=1"
+set_status cart t01-add done
+has "all tasks done is phase done" "$(ws phase cart)" "phase=done"
+mkdir -p docs/stories/tiny && printf '# Spec\n- FR1: one change\n' > docs/stories/tiny/spec.md && printf '# Plan\n' > docs/stories/tiny/plan.md
+task_file tiny t01-change pending
+has "a planned story without a design section is phase build" "$(ws phase tiny)" "phase=build"
+
 echo "worktrees"
 new_repo wt
 task_file shop t01-cart pending
