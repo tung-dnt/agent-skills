@@ -29,13 +29,14 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 
 ## Commands
 
-13 slash commands that map to the development lifecycle. Each one activates the right skills automatically.
+14 slash commands that map to the development lifecycle. Each one activates the right skills automatically.
 
 | What you're doing | Command | Key principle |
 |-------------------|---------|---------------|
 | Plan an epic or a new project | `/epic` | Intent, requirements, architecture, story map |
 | Take a story to an approved plan | `/story` | Resumes at its current phase |
 | Build one task end to end | `/task` | Claim → design note → test-first → review |
+| Stress-test a plan or decision | `/grill-me` | Settle every branch before acting |
 | Define what to build | `/spec` | Spec before code |
 | Plan how to build it | `/plan` | Small, atomic tasks |
 | Build incrementally | `/build` | One slice at a time |
@@ -104,7 +105,7 @@ In an end-to-end run on 4 tasks, three builders ran concurrently and all 26 test
 **Fastest path — any agent, one command.** The open [skills CLI](https://github.com/vercel-labs/skills) installs into 70+ agents (Claude Code, Cursor, Codex, Copilot, Cline, and more):
 
 ```bash
-npx skills add tung-dnt/agent-skills            # install all 27 skills
+npx skills add tung-dnt/agent-skills            # install all 28 skills
 npx skills add tung-dnt/agent-skills --list     # browse before installing
 ```
 
@@ -286,9 +287,9 @@ Already installed? How you roll the pack out depends on your codebase. The **[Ad
 
 ---
 
-## All 27 Skills
+## All 28 Skills
 
-The commands above are entry points. The pack includes 27 skills total — 26 lifecycle skills plus the `using-agent-skills` meta-skill. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
+The commands above are entry points. The pack includes 28 skills total — 27 lifecycle skills plus the `using-agent-skills` meta-skill. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
 
 ### Meta - Discover which skill applies
 
@@ -301,6 +302,7 @@ The commands above are entry points. The pack includes 27 skills total — 26 li
 | Skill | What It Does | Use When |
 |-------|-------------|----------|
 | [interview-me](skills/interview-me/SKILL.md) | One-question-at-a-time interview that extracts what the user actually wants instead of what they think they should want, until ~95% confidence | The ask is underspecified, or the user invokes "interview me" / "grill me" |
+| [grill-me](skills/grill-me/SKILL.md) | Stress-tests a plan, decision, or idea you already have: rounds of numbered questions with recommended answers, walked as a design tree until every branch is settled | You want your thinking challenged before you act on it ("grill me") |
 | [idea-refine](skills/idea-refine/SKILL.md) | Structured divergent/convergent thinking to turn vague ideas into concrete proposals | You have a rough concept that needs exploration |
 | [spec-driven-development](skills/spec-driven-development/SKILL.md) | Write a PRD covering objectives, commands, structure, code style, testing, and boundaries before any code | Starting a new project, feature, or significant change |
 | [constraint-driven-development](skills/constraint-driven-development/SKILL.md) | Interviews you for a quality bar with sane default thresholds, writes CONSTRAINTS.md, places each check by cost, and catches agents silencing checks or skipping tests to get green | No standards are written down, or an agent is producing more than anyone reads |
@@ -426,14 +428,14 @@ The portable core stays in shared directories. Host-specific paths are native di
 
 | Layer / consumer | Repository paths | Purpose |
 |---|---|---|
-| Shared workflow core | `skills/` (27 skills) | Portable `SKILL.md` workflows used by every integration |
+| Shared workflow core | `skills/` (28 skills) | Portable `SKILL.md` workflows used by every integration |
 | Shared review material | `agents/` (6 agents), `references/` (9 references) | Specialist reviewers, delegated workers, and pack-level references carried by whole-repo installs |
-| Claude Code adapter | `.claude/commands/` (13 commands), `.claude-plugin/`, `hooks/` | Slash-command wrappers, marketplace metadata, lifecycle hooks, and `work-state.sh` |
-| Gemini CLI adapter | `.gemini/commands/` (13 commands) | Gemini-native TOML command wrappers |
-| Antigravity CLI adapter | `commands/` (13 commands), `plugin.json` | Legacy TOML wrappers and the root plugin manifest; see the [known wrapper limitation](docs/antigravity-setup.md#lifecycle-workflows-and-command-compatibility) |
+| Claude Code adapter | `.claude/commands/` (14 commands), `.claude-plugin/`, `hooks/` | Slash-command wrappers, marketplace metadata, lifecycle hooks, and `work-state.sh` |
+| Gemini CLI adapter | `.gemini/commands/` (14 commands) | Gemini-native TOML command wrappers |
+| Antigravity CLI adapter | `commands/` (14 commands), `plugin.json` | Legacy TOML wrappers and the root plugin manifest; see the [known wrapper limitation](docs/antigravity-setup.md#lifecycle-workflows-and-command-compatibility) |
 | Codex adapter | `.codex-plugin/`, `.agents/plugins/` | Codex plugin metadata and marketplace registration; Codex consumes `skills/` directly |
 | GitHub Copilot CLI adapter | `plugin.json` | Root plugin metadata; Copilot CLI discovers `skills/` by convention and does not register the lifecycle wrappers |
-| Contributor tooling | `scripts/` (13 scripts), `evals/` (27 case files), `.github/workflows/` | Validation, routing evals, and CI |
+| Contributor tooling | `scripts/` (13 scripts), `evals/` (28 case files), `.github/workflows/` | Validation, routing evals, and CI |
 | Documentation | `docs/` | Universal guidance and per-tool setup guides |
 
 Tools without a checked-in adapter directory install or copy the shared `skills/` core into their own native location. The [Quick Start](#quick-start) links the setup guide for each supported host.

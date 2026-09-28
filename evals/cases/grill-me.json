@@ -1,0 +1,44 @@
+{
+  "skill_name": "grill-me",
+  "trigger": {
+    "positive": [
+      {
+        "prompt": "Grill me on this migration plan before I commit to it",
+        "top_k": 1
+      },
+      {
+        "prompt": "Stress-test my thinking on switching our queue to Kafka",
+        "top_k": 3
+      },
+      {
+        "prompt": "Grill this design decision relentlessly until nothing is assumed",
+        "top_k": 3
+      }
+    ],
+    "negative": [
+      {
+        "prompt": "Build me a dashboard, I'm not sure for whom yet",
+        "owner": "interview-me"
+      },
+      {
+        "prompt": "Write an ADR recording why we picked Postgres over DynamoDB",
+        "owner": "documentation-and-adrs"
+      }
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "kind": "dialogue",
+      "prompt": "Grill me on this plan: we'll move all background jobs from cron on one VM to a managed queue with autoscaled workers next sprint.",
+      "expected_output": "A first round of numbered questions covering only decisions with settled prerequisites, each with a recommended answer, then a stop to wait for answers",
+      "expectations": [
+        "Questions are numbered and each carries a recommended answer",
+        "The round asks only frontier questions; questions that depend on an unanswered one are deferred to a later round",
+        "Facts the agent could look up are not asked of the user",
+        "The agent stops after the round and waits instead of answering its own questions or acting on the plan",
+        "No code, spec, or plan is written"
+      ]
+    }
+  ]
+}

@@ -19,6 +19,7 @@ Know the scope already? The entry commands are `/epic` (a product or a set of ca
 Task arrives
     │
     ├── Don't know what you want yet? ──────→ interview-me
+    ├── Have a plan, want it stress-tested? ─→ grill-me
     ├── Have a rough concept, need variants? → idea-refine
     ├── New project/feature/change? ──→ spec-driven-development
     ├── No quality bar written down? ──→ constraint-driven-development
@@ -176,6 +177,7 @@ Not every task needs every skill. A bug fix might only need: `debugging-and-erro
 | Phase | Skill | One-Line Summary |
 |-------|-------|-----------------|
 | Define | interview-me | Surface what the user actually wants before any plan, spec, or code exists |
+| Define | grill-me | Stress-test an existing plan or decision in rounds until every branch is settled |
 | Define | idea-refine | Refine ideas through structured divergent and convergent thinking |
 | Define | spec-driven-development | Requirements and acceptance criteria before code |
 | Plan | high-level-design | System shape and shared contracts before tasks are planned |
