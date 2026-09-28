@@ -54,6 +54,30 @@ test('passes when producers and consumers use the canonical artifact paths', () 
   assert.match(result.stdout, /5 files checked — 0 error\(s\) — PASSED/);
 });
 
+test('passes when every surface uses the per-story layout', () => {
+  const root = makeSandbox();
+  writeFile(root, '.claude/commands/spec.md', 'Save the story spec to `docs/stories/[story-id]/spec.md`.\n');
+  writeFile(root, '.claude/commands/plan.md', 'Save the plan to `docs/stories/[story-id]/plan.md`, one file per task under `tasks/`.\n');
+  writeFile(root, '.claude/commands/build.md', 'Read `docs/stories/[story-id]/plan.md`; fall back to legacy `tasks/plan.md`.\n');
+  writeFile(root, 'skills/low-level-design/SKILL.md', 'Cite contracts from `docs/stories/[story-id]/spec.md`.\n');
+
+  const result = run(root);
+
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.match(result.stdout, /4 files checked — 0 error\(s\) — PASSED/);
+});
+
+test('fails when one surface drifts to a different per-story placeholder', () => {
+  const root = makeSandbox();
+  writeFile(root, '.claude/commands/plan.md', 'Save the plan to `docs/stories/[story-id]/plan.md`.\n');
+  writeFile(root, '.claude/commands/build.md', 'Read `docs/stories/[story]/plan.md`.\n');
+
+  const result = run(root);
+
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout, /docs\/stories\/\[story\]\/plan\.md/);
+});
+
 test('fails when a producer drifts to an unapproved artifact path (the #93 regression)', () => {
   const root = makeSandbox();
   // Only the producers are changed to the per-feature layout; consumers stay on the old paths.

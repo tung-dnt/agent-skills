@@ -4,6 +4,8 @@ Reference catalog of agent orchestration patterns this repo endorses, plus anti-
 
 The governing rule: **the user (or a slash command) is the orchestrator. Personas do not invoke other personas.** Skills are mandatory hops inside a persona's workflow.
 
+For which model tier each delegated piece runs on, and the output contract subagents return, see `model-routing.md`.
+
 ---
 
 ## Endorsed patterns

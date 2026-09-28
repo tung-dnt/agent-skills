@@ -115,6 +115,8 @@ Every skill includes a verification step. A task is not complete until verificat
 
 Per-skill verification is the local check. The project-wide bar that applies to *every* change, regardless of which skill is active, is the Definition of Done: tests pass, no regressions, behavior verified at runtime, docs updated. See `../../references/definition-of-done.md`. It complements each task's acceptance criteria rather than replacing them.
 
+When work is delegated to subagents, `../../references/model-routing.md` sets which model tier each piece runs on and what a subagent returns: short summaries and file paths, never file dumps. The main thread keeps the model the user selected.
+
 ## Failure Modes to Avoid
 
 These are the subtle errors that look like productivity but create problems:

@@ -1,0 +1,16 @@
+{
+  "description": "Suggests /resume when a new session starts on, or next to, a claimed task (see references/work-artifacts.md). Silent otherwise.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh\" hint",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

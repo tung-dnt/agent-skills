@@ -28,6 +28,7 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 | Define what to build | `/spec` | Spec before code |
 | Plan how to build it | `/plan` | Small, atomic tasks |
 | Build incrementally | `/build` | One slice at a time |
+| Pick up after a closed session | `/resume` | State lives in files, not chat |
 | Prove it works | `/test` | Tests are proof |
 | Set the quality bar | `/constraints` | Decide it once, enforce it everywhere |
 | Review before merge | `/review` | Improve code health |
@@ -36,6 +37,8 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 | Ship to production | `/ship` | Faster is safer |
 
 Want fewer manual steps once the spec exists? **`/build auto`** generates the plan and implements every task in a single approved pass — you approve the plan once, then it runs autonomously. It removes the human stepping *between* tasks, not the verification: every task is still test-driven and committed individually, and it pauses on failures or risky steps.
+
+Several sessions can build one plan at once: `/plan` writes one file per task under `docs/stories/[story-id]/`, and `/build` claims a task with a git lock before starting, so two sessions never take the same task or edit the same file ([references/work-artifacts.md](references/work-artifacts.md)). The Claude Code plugin registers one SessionStart hook, `hooks/work-state.sh hint`. It prints a one-line `/resume` suggestion when claimed tasks exist, and nothing otherwise.
 
 Skills also activate automatically based on what you're doing — designing an API triggers `api-and-interface-design`, building UI triggers `frontend-ui-engineering`, and so on.
 

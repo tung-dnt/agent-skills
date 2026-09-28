@@ -30,7 +30,7 @@
     {
       "id": 1,
       "prompt": "Break the attached notifications spec into an executable plan.",
-      "expected_output": "Ordered tasks in tasks/plan.md, each small, verifiable, with acceptance criteria and dependencies",
+      "expected_output": "A story plan at docs/stories/<story-id>/plan.md with an ordered task index, plus one task file per task under its tasks/ folder, each small, verifiable, with acceptance criteria and dependencies",
       "files": [
         "planning-and-task-breakdown"
       ],
@@ -38,7 +38,9 @@
         "Every task has acceptance criteria",
         "Tasks are ordered by dependency",
         "Tasks are vertical slices rather than horizontal layers",
-        "No implementation code is written during planning"
+        "No implementation code is written during planning",
+        "The plan is saved under docs/stories/<story-id>/ and one task file per task is created under its tasks/ folder with status: pending in the frontmatter",
+        "Task status is recorded only in the task files; plan.md holds an index without checkboxes to tick"
       ]
     }
   ]

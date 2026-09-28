@@ -130,6 +130,9 @@ jobs:
       - name: Test simplify-ignore hook
         run: bash hooks/simplify-ignore-test.sh
 
+      - name: Test work-state hook (throwaway git repos)
+        run: bash hooks/work-state-test.sh
+
   validate:
     name: Validate plugin structure
     needs: [validate-skills, validate-commands, validate-platforms]

@@ -35,8 +35,13 @@ const ROOT = path.resolve(__dirname, '..');
 const ARTIFACT_ALLOWLIST = new Set([
   'SPEC.md',        // spec, project root (produced by /spec, read by /build)
   'docs/SPEC.md',   // spec, alternate location accepted by /build
-  'tasks/plan.md',  // plan (produced by /plan, read by /build)
-  'tasks/todo.md',  // task list (produced by /plan)
+  'tasks/plan.md',  // legacy single-plan layout (read by /build as a fallback)
+  'tasks/todo.md',  // legacy single-plan task list
+  // Per-story layout, safe for parallel sessions (references/work-artifacts.md).
+  // Task state lives in docs/stories/[story-id]/tasks/[task-id].md, which this
+  // pattern does not match, so only the spec and plan paths are pinned here.
+  'docs/stories/[story-id]/spec.md', // story spec + ## Design
+  'docs/stories/[story-id]/plan.md', // story task index (produced by /plan, read by /build)
 ]);
 
 // The files that make up the spec -> plan -> build pipeline. Absent files are
@@ -62,6 +67,8 @@ const GUARDED_FILES = [
   // Skills the commands invoke
   'skills/spec-driven-development/SKILL.md',
   'skills/planning-and-task-breakdown/SKILL.md',
+  'skills/high-level-design/SKILL.md',
+  'skills/low-level-design/SKILL.md',
   // Docs that tell users where the artifacts live
   'docs/getting-started.md',
   'docs/adoption-guide.md',

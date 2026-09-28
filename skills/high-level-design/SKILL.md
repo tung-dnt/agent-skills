@@ -37,7 +37,7 @@ Work top-down. Finish the shape layer before the contracts layer; contracts writ
 
 - Read the spec. Give every functional requirement and non-functional requirement a stable id (`FR1`, `NFR1`) if it lacks one; the design traces back to these.
 - Read `CONSTRAINTS.md` if the project has one (see `constraint-driven-development`); its thresholds are non-functional requirements too.
-- Read the existing architecture: current services, data stores, integration points, and existing ADRs. Extend what exists before inventing something new.
+- Read the existing architecture: current services, data stores, integration points, and existing ADRs. Extend what exists before inventing something new. In a large codebase, delegate this reading to a fast-tier, read-only subagent that returns a short component summary, so the design context stays small (`../../references/model-routing.md`).
 
 ### Step 2: Scope
 
@@ -105,11 +105,11 @@ Compare at least two viable designs for the decisions that are expensive to reve
 
 ### Step 12: Doubt, then human approval
 
-Run the design through `doubt-driven-development` with the spec as the contract: a fresh-context reviewer looks for requirements with no design element, NFRs with no mechanism, and failure paths nobody owns. Fold the findings back in, then present the design for human approval. Tasks are planned only against an approved design.
+Run the design through `doubt-driven-development` with the spec as the contract, on the deep tier (the main thread's model), in a fresh context: a fresh-context reviewer looks for requirements with no design element, NFRs with no mechanism, and failure paths nobody owns. Fold the findings back in, then present the design for human approval. Tasks are planned only against an approved design.
 
 ## Output
 
-Write the design into the spec as a `## Design` section (or a sibling `design.md` if the spec is already long), so it lives in the repository next to the code:
+Write the design into the story spec, `docs/stories/[story-id]/spec.md`, as a `## Design` section (or a sibling `design.md` if the spec is already long), so it lives in the repository next to the code:
 
 ```markdown
 ## Design

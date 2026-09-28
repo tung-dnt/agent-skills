@@ -170,7 +170,7 @@ This portability gap is tracked in
 
 ## Spec and task artifacts
 
-The `/spec` and `/plan` commands create working artifacts (`SPEC.md`, `tasks/plan.md`, `tasks/todo.md`). Treat them as **living documents** while the work is in progress:
+The `/spec` and `/plan` commands create working artifacts: a project-level `SPEC.md`, and per story `docs/stories/[story-id]/spec.md`, `docs/stories/[story-id]/plan.md`, and one task file per task under `docs/stories/[story-id]/tasks/`. Each task file carries its own status, design note, subtasks, and log, so several sessions can build the same plan without overwriting each other. [references/work-artifacts.md](../references/work-artifacts.md) has the full layout and the claim protocol. If your repo already keeps specs somewhere else, the commands detect it and propose a location in `.agent-skills.json` for you to confirm. Treat these files as **living documents** while the work is in progress:
 
 - Keep them in version control during development so the human and the agent have a shared source of truth.
 - Update them when scope or decisions change.
@@ -181,11 +181,11 @@ The `/spec` and `/plan` commands create working artifacts (`SPEC.md`, `tasks/pla
 The same artifacts are the handoff between sessions. For a small task, run the whole lifecycle in one session. For anything non-trivial, a fresh session per phase (spec → plan → build → review) keeps context focused — what carries the work forward is the approved files, not the conversation:
 
 - the spec — `SPEC.md`, or wherever your spec actually lives
-- `tasks/plan.md` and `tasks/todo.md` — or the external tracker the plan identifies, if you use one
+- the story's `docs/stories/[story-id]/plan.md` and its task files — or the external tracker the plan identifies, if you use one
 
 **Before switching**, make sure those files reflect the decisions that still apply, the scope you approved, the questions still open, the next task, and the current verification state (which tests ran, against what).
 
-**In the new session**, read the actual files and look at `git status` before doing anything. Don't assume approvals you can't see in the artifacts. Treat a recorded "tests pass" as a claim about a specific baseline: re-run the checks it covers if the code has moved since, if it doesn't say what was run against what, or if you're about to touch the area it covered. If the baseline still holds, take it and get on with the next task — the point is a check proportional to what changed, not a full suite at every handoff.
+**In the new session**, run `/resume` (Claude Code also suggests it at startup when a claimed task exists). It has a read-only subagent rebuild the ticked progress tree, find where each in-progress task stopped, and recommend the next step. Without the command, read the actual files and look at `git status` before doing anything. Don't assume approvals you can't see in the artifacts. Treat a recorded "tests pass" as a claim about a specific baseline: re-run the checks it covers if the code has moved since, if it doesn't say what was run against what, or if you're about to touch the area it covered. If the baseline still holds, take it and get on with the next task — the point is a check proportional to what changed, not a full suite at every handoff.
 
 #### Task-boundary restarts and Ralph loops
 
@@ -195,9 +195,9 @@ A shell-level "Ralph loop" is harness behavior, not a separate skill workflow. I
 
 This doesn't need the `/spec` and `/plan` wrappers — plain requests work in any agent, including a `npx skills add` install that only has the skills:
 
-> Read SPEC.md, then break it into small verifiable tasks with acceptance criteria and dependency order. Save them to tasks/plan.md and tasks/todo.md. No product code yet — show me the plan first.
+> Read docs/stories/[story-id]/spec.md, then break it into small verifiable tasks with acceptance criteria and dependency order. Save the plan to docs/stories/[story-id]/plan.md and one file per task under its tasks/ folder. No product code yet — show me the plan first.
 
-> Read SPEC.md, tasks/plan.md and tasks/todo.md, then check where things actually stand — `git status`, plus re-running whatever checks the recorded verification state no longer covers. Tell me the next unchecked task and anything still open, then stop: I'll confirm the scope before you start it. If the plan looks incomplete, say what's missing rather than rewriting it.
+> Read docs/stories/[story-id]/spec.md, docs/stories/[story-id]/plan.md and its task files, then check where things actually stand — `git status`, plus re-running whatever checks the recorded verification state no longer covers. Tell me the next unclaimed task and anything still open, then stop: I'll confirm the scope before you start it. If the plan looks incomplete, say what's missing rather than rewriting it.
 
 ## Tips
 

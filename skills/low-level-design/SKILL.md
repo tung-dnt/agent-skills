@@ -9,7 +9,7 @@ description: Produces a short low-level design note for one implementation task 
 
 Code generation is fast; deciding intent is not. Without a written low-level design, the implementation makes the hard calls silently — what happens on a duplicate, which check runs first, what a partial failure leaves behind — and makes them differently each time. This skill makes those calls explicit, in writing, before the first test, in a note short enough to read in a minute.
 
-The note is 5 to 15 lines and lives in the task's own entry in the plan (or in the task's tracker item, when the plan uses an external tracker). It designs the **inside** of one task. The shared contracts it builds on — the APIs, schemas, status lifecycles, and failure policy that more than one task depends on — were fixed by the `high-level-design` skill and carry ids like `C3`; this skill cites them and never changes them. Anything that belongs to this task alone — a new endpoint or table no other task reads or writes — is designed here.
+The note is 5 to 15 lines and lives in the `## Design` section of the task's own file, `docs/stories/[story-id]/tasks/[task-id].md` (or in the task's tracker item, when the plan uses an external tracker). Only the session that claimed the task writes that file, so parallel sessions never collide (see `../../references/work-artifacts.md`); the plan itself is never edited. It designs the **inside** of one task. The shared contracts it builds on — the APIs, schemas, status lifecycles, and failure policy that more than one task depends on — were fixed by the `high-level-design` skill and carry ids like `C3`; this skill cites them and never changes them. Anything that belongs to this task alone — a new endpoint or table no other task reads or writes — is designed here.
 
 ## When to Use
 
@@ -27,7 +27,7 @@ The note is 5 to 15 lines and lives in the task's own entry in the plan (or in t
 
 ### Step 1: Load only what the task needs
 
-Read the task entry, the design sections it cites (shared contract ids like `C3`), and the code it will touch. Follow `context-engineering`: load the relevant slices, not the whole spec. Note the patterns the existing code already uses — error style, data-access layer, transaction handling — and match them. A note that invents a second way to do what the codebase already does has failed.
+Read the task file, the design sections its `design_refs` cite (shared contract ids like `C3`), and the code it will touch. Follow `context-engineering`: load the relevant slices, not the whole spec. Note the patterns the existing code already uses — error style, data-access layer, transaction handling — and match them. A note that invents a second way to do what the codebase already does has failed.
 
 ### Step 2: Contracts at this task's edges
 
@@ -77,29 +77,26 @@ An edge case with no test is an undecided edge case.
 
 ### Step 7: Check the size, then escalate or proceed
 
-- **Over 15 lines?** The task is too big. Split it in the plan.
+- **Over 15 lines?** The task is too big. Stop and ask for it to be split into new tasks; don't edit the plan from inside a task.
 - **Touches anything shared?** Stop if the task changes something cited by a `C` id, adds a component, creates an endpoint, status, or event another task will use, or alters a table, endpoint, or message that any other task also reads or writes. Adding a column to a shared table counts, even if only this task will use the column. Other tasks and their tests depend on that shape. Raise it against the `## Design` section (`high-level-design`) and get it approved before continuing. Never patch a shared contract from inside a task.
 - **Adds an endpoint, table, or rule that belongs to this task alone?** That's in scope: design it in the note.
-- **Otherwise** write the note into the task entry and hand off to `test-driven-development` and `incremental-implementation`.
+- **Otherwise** write the note into the task file's `## Design` section and hand off to `test-driven-development` and `incremental-implementation`.
 
 ## Note Template
 
-Add the note under the task entry in the plan:
+Fill the `## Design` section of the task file (the task's `design_refs` in its frontmatter, here `[C2, C4]`, say which contracts it cites):
 
 ```markdown
-## Task 4: Refund a captured payment
-- Acceptance: …
-- Design refs: C2 (payment status lifecycle), C4 (provider call policy)
-- LLD:
-  - Edge: `refundPayment(tx, {paymentId, amountCents, requestId}, caller) → {refundId, status}`,
-    e.g. `{paymentId: "pay_9", amountCents: 500, requestId: "rq_1"}` → `{refundId: "rf_3", status: "PENDING"}`
-  - Rules: amount ≤ captured − already refunded, else 422; status changes per C2
-  - Flow: 1 lock payment (merchant-scoped) → 2 remaining-amount check → 3 provider refund (C4) → 4 refund row + status in one tx
-  - Failure: provider timeout → PENDING, reconciler finishes it (C4); db error → rollback, 503, retry safe via requestId
-  - Concurrency: row lock serialises refunds on the same payment
-  - Security: caller's merchant id must equal payment.merchant_id, checked in step 1; never log card or bank fields
-  - Observability: counter `refund_result{outcome}`
-  - Tests: over-refund 422 · other merchant 404 · duplicate requestId · provider timeout · db error then retry · full refund → REFUNDED
+## Design
+- Edge: `refundPayment(tx, {paymentId, amountCents, requestId}, caller) → {refundId, status}`,
+  e.g. `{paymentId: "pay_9", amountCents: 500, requestId: "rq_1"}` → `{refundId: "rf_3", status: "PENDING"}`
+- Rules: amount ≤ captured − already refunded, else 422; status changes per C2
+- Flow: 1 lock payment (merchant-scoped) → 2 remaining-amount check → 3 provider refund (C4) → 4 refund row + status in one tx
+- Failure: provider timeout → PENDING, reconciler finishes it (C4); db error → rollback, 503, retry safe via requestId
+- Concurrency: row lock serialises refunds on the same payment
+- Security: caller's merchant id must equal payment.merchant_id, checked in step 1; never log card or bank fields
+- Observability: counter `refund_result{outcome}`
+- Tests: over-refund 422 · other merchant 404 · duplicate requestId · provider timeout · db error then retry · full refund → REFUNDED
 ```
 
 ## At Review
@@ -130,7 +127,7 @@ The note is the review baseline. `code-review-and-quality` checks the diff again
 
 ## Verification
 
-- [ ] The note sits in the task entry and is 15 lines or fewer
+- [ ] The note sits in the task file's `## Design` section and is 15 lines or fewer; the plan is unchanged
 - [ ] Edge signatures and types are written with one concrete example
 - [ ] Every invariant has a decided outcome on violation
 - [ ] Every flow step that can fail has a failure branch

@@ -112,6 +112,8 @@ Don't silently fill in ambiguous requirements. The spec's entire purpose is to s
    - **Ask first:** Database schema changes, adding dependencies, changing CI config
    - **Never do:** Commit secrets, edit vendor directories, remove failing tests without approval
 
+**Where the spec goes:** a spec for the whole project (or a capability map) is `SPEC.md` at the project root. A spec for one story or feature is `docs/stories/[story-id]/spec.md`, so its plan and task files sit beside it and several stories can be in flight at once (see `../../references/work-artifacts.md`).
+
 **Spec template:**
 
 ```markdown
@@ -181,7 +183,7 @@ With the validated spec, generate a technical implementation plan:
 
 > Follow `planning-and-task-breakdown` for the dependency-graph mapping and vertical-slicing mechanics behind these steps; it is the canonical source. The bullets above are a lightweight summary; if they ever diverge, `planning-and-task-breakdown` takes precedence.
 >
-> **Output convention:** Save the plan to `tasks/plan.md` and record the task list in the task list target defined by `planning-and-task-breakdown` (default `tasks/todo.md`; projects may designate an external tracker instead). Create `tasks/` if it does not exist. Downstream commands (`/build`, etc.) expect these defaults.
+> **Output convention:** Save the plan to `docs/stories/[story-id]/plan.md` and record the tasks in the task list target defined by `planning-and-task-breakdown` (default: one file per task under `docs/stories/[story-id]/tasks/`; projects may designate an external tracker instead). Downstream commands (`/build`, etc.) expect these defaults.
 
 The plan should be reviewable: the human should be able to read it and say "yes, that's the right approach" or "no, change X."
 
@@ -248,6 +250,6 @@ Before proceeding to implementation, confirm:
 - [ ] The human has reviewed and approved the spec
 - [ ] Success criteria are specific and testable
 - [ ] Boundaries (Always/Ask First/Never) are defined
-- [ ] The spec is saved to a file in the repository
+- [ ] The spec is saved to a file in the repository (`SPEC.md` for a project, `docs/stories/[story-id]/spec.md` for a story)
 - [ ] If the request bundles several independently testable capabilities, a capability map (module ids, dependency direction, build order) was approved before any module spec was written
 - [ ] Every module spec traces to a module id in the approved map
