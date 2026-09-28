@@ -54,6 +54,17 @@ Anything longer goes into a file, and the summary points to it. The main thread 
 - Launch a wave's subagents back-to-back without waiting for results (in one turn where the host allows), so they run concurrently. Collect all the summaries before starting the next wave.
 - Each builder works in its own worktree on its own claim (see `work-artifacts.md`), so builders never share files or a git index.
 
+## Subagent Command Rules
+
+Subagents run unattended. Every permission prompt they trigger stops the user mid-task, whatever the session's permission mode. Permission checks can only approve commands they can read, and a plugin can't give its agents a looser mode. So every subagent follows these rules, and every subagent prompt the orchestrator writes repeats them:
+
+1. **One plain command per shell call.** No multi-line scripts, `set -e`, shell variables, `$(…)`, `&&` or `;` chains, or `cd dir && …`. Use absolute literal paths.
+2. **File tools for file work.** Read, Write, Edit, Glob, and Grep instead of `cat`, `cp`, `mkdir`, `sed`, `find`, or `echo >`.
+3. **No recursive deletes** (`rm -r`, `rm -rf`, `rmdir`). Put scratch work in a new, uniquely named directory. The orchestrator cleans up.
+4. **No always-ask commands:** `git push`, `ssh`, `docker run`, `docker exec`, `psql`, `kubectl`, `terraform`, or any `publish`. When the work needs one, report `needs-command` with the exact command, its working directory, and why. The orchestrator runs it once in the main session and passes back the output.
+
+The agents in `agents/` carry a copy of these rules. When they change, update every copy.
+
 ## Escalation
 
 1. A fast-tier job that is unsure or fails is re-run at the balanced tier.

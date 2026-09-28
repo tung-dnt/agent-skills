@@ -22,6 +22,14 @@ The orchestrator gives you the path to `work-state.sh`, the resolved stories dir
    - Compare the ticked boxes with the code actually present. Flag any box that is ticked for work that isn't there.
 3. Choose one recommended next action: continue a named task, start the next unclaimed one, or release a merged lock.
 
+
+## Commands
+
+You run unattended, so write every command so it never needs a permission prompt (`references/model-routing.md`, "Subagent Command Rules"):
+- one plain command per shell call: no scripts, variables, `$(…)`, or `&&` / `;` chains
+- the file tools (Read, Grep, Glob) instead of `cat`, `find`, or `grep` in the shell
+- never delete recursively, and never run `git push`, `ssh`, `docker run`, `docker exec`, `psql`, `kubectl`, `terraform`, or `publish`. If you need one, name the exact command in your report as `needs-command` and let the orchestrator run it.
+
 ## Report (at most 15 lines, plus the tree)
 
 ```

@@ -12,6 +12,8 @@ Work at **epic scope**: a product, a new system, or a set of capabilities that c
 
 Pick the epic id: a tracker key in lowercase, or a short kebab-case slug.
 
+**Every subagent prompt you write ends with the subagent command rules** (`references/model-routing.md` in the plugin): one plain command per shell call, with no scripts, variables, `$(…)`, or `&&` / `;` chains; the file tools for file work; no recursive deletes; and no `git push`, `ssh`, `docker run`, `docker exec`, `psql`, `kubectl`, `terraform`, or `publish`. For those it reports `needs-command`, and you run the command in this session. This keeps subagents from stopping the user with permission prompts.
+
 ## Steps
 
 1. **Intent.** Invoke agent-skills:interview-me until you're about 95% confident about who it's for, what problem it solves, why now, and what success looks like. If several directions are plausible, also run agent-skills:idea-refine. Skip questions that `docs/epics/[epic-id]/epic.md` or `SPEC.md` already answer.

@@ -65,6 +65,14 @@ Map findings to the OWASP Top 10 for LLM Applications where relevant.
 | **Low** | Theoretical risk or defense-in-depth improvement | Schedule for next sprint |
 | **Info** | Best practice recommendation, no current risk | Consider adopting |
 
+
+## Commands
+
+You run unattended, so write every command so it never needs a permission prompt (`references/model-routing.md`, "Subagent Command Rules"):
+- one plain command per shell call: no scripts, variables, `$(…)`, or `&&` / `;` chains
+- the file tools (Read, Grep, Glob) instead of `cat`, `find`, or `grep` in the shell
+- never delete recursively, and never run `git push`, `ssh`, `docker run`, `docker exec`, `psql`, `kubectl`, `terraform`, or `publish`. If you need one, name the exact command in your report as `needs-command` and let the orchestrator run it.
+
 ## Output Format
 
 ```markdown

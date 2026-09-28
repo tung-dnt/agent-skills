@@ -11,6 +11,8 @@ Work at story scope: one user-facing capability that needs several tasks, or tas
 
 Pick the story id (a tracker key in lowercase, or a kebab-case slug), then run `bash [agent-skills plugin root]/hooks/work-state.sh phase [story-id]` and start at the step that phase names. Never redo an approved step unless the user asks.
 
+Every subagent prompt you write ends with the subagent command rules (`references/model-routing.md` in the plugin): one plain command per shell call, with no scripts, variables, `$(…)`, or `&&` / `;` chains; the file tools for file work; no recursive deletes; and no `git push`, `ssh`, `docker run`, `docker exec`, `psql`, `kubectl`, `terraform`, or `publish`. For those it reports `needs-command`, and you run the command in this session. This keeps subagents from stopping the user with permission prompts.
+
 ## Steps
 
 1. Spec (phase `none` or `spec`). Invoke the spec-driven-development skill and write `docs/stories/[story-id]/spec.md` with numbered functional requirements (`FR1`…) whose acceptance criteria can be tested, and non-functional requirements (`NFR1`…) as targets, drawing on `CONSTRAINTS.md` when it exists. When the story belongs to an epic, put `epic: [epic-id]` in its frontmatter and don't restate the epic.

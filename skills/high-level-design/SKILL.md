@@ -37,7 +37,7 @@ Work top-down. Finish the shape layer before the contracts layer; contracts writ
 
 - Read the spec. Give every functional requirement and non-functional requirement a stable id (`FR1`, `NFR1`) if it lacks one; the design traces back to these.
 - Read `CONSTRAINTS.md` if the project has one (see `constraint-driven-development`); its thresholds are non-functional requirements too.
-- Read the existing architecture: current services, data stores, integration points, and existing ADRs. Extend what exists before inventing something new. In a large codebase, delegate this reading to a fast-tier, read-only subagent that returns a short component summary, so the design context stays small (`../../references/model-routing.md`).
+- Read the existing architecture: current services, data stores, integration points, and existing ADRs. Extend what exists before inventing something new. In a large codebase, delegate this reading to a fast-tier, read-only subagent that returns a short component summary, so the design context stays small. Give it the subagent command rules from `../../references/model-routing.md`, so it never stops the user with permission prompts.
 
 ### Step 2: Scope
 
