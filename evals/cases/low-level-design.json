@@ -1,0 +1,54 @@
+{
+  "skill_name": "low-level-design",
+  "trigger": {
+    "positive": [
+      {
+        "prompt": "Write the low-level design for task 3 before I start implementing it",
+        "top_k": 1
+      },
+      {
+        "prompt": "Before coding this subtask, work out the function signatures, edge cases, and error handling",
+        "top_k": 3
+      },
+      {
+        "prompt": "Decide the retry, idempotency, and concurrency behaviour for this task before we write the code",
+        "top_k": 3
+      }
+    ],
+    "negative": [
+      {
+        "prompt": "Write a failing test that reproduces this bug, then fix it",
+        "owner": "test-driven-development"
+      },
+      {
+        "prompt": "Implement this feature in small slices, testing each one before moving on",
+        "owner": "incremental-implementation"
+      },
+      {
+        "prompt": "Design the system architecture for this story and decide which services talk to each other",
+        "owner": "high-level-design"
+      }
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "kind": "execution",
+      "prompt": "Task 2 in the plan is next. Write its low-level design note before implementing it.",
+      "expected_output": "A short design note added to the task entry: edge contracts, invariants, flow with failure branches, failure policy, security line, observability line, and the test cases they imply",
+      "files": [
+        "low-level-design"
+      ],
+      "expectations": [
+        "The note is added to the Task 2 entry in the plan file and stays short (roughly 5 to 15 lines of design, not a long spec)",
+        "The note states the task's function signature or types at its edges with one concrete example",
+        "Out-of-order events and invalid transitions are handled by citing the C3 and C4 contracts rather than re-deriving or contradicting them",
+        "The note deals explicitly with the same event reaching the worker twice (C6 at-least-once delivery), either with data that already exists or by escalating the shared-contract change it needs, instead of leaving duplicate history rows to chance",
+        "The security line is not a bare n/a: because the worker has no caller, it names the trust boundary it relies on (signature verification at the webhook) and any fields that must not be logged",
+        "Each edge case and failure rule in the note maps to at least one listed test case",
+        "Any change to a shared table or contract is escalated rather than silently designed into the task",
+        "No implementation code is written"
+      ]
+    }
+  ]
+}

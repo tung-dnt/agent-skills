@@ -1,0 +1,54 @@
+{
+  "skill_name": "high-level-design",
+  "trigger": {
+    "positive": [
+      {
+        "prompt": "Turn this user story into a high-level design: components, data flow, and how we meet the latency requirement",
+        "top_k": 1
+      },
+      {
+        "prompt": "The requirements for order tracking are written. Design the system architecture before we plan the tasks",
+        "top_k": 3
+      },
+      {
+        "prompt": "Sketch the architecture and sequence diagrams for this feature and decide sync versus async between the services",
+        "top_k": 3
+      }
+    ],
+    "negative": [
+      {
+        "prompt": "Design a REST endpoint for creating invoices, including error responses and versioning",
+        "owner": "api-and-interface-design"
+      },
+      {
+        "prompt": "Write an ADR recording why we picked Postgres over DynamoDB",
+        "owner": "documentation-and-adrs"
+      },
+      {
+        "prompt": "Break this spec into small verifiable tasks with acceptance criteria",
+        "owner": "planning-and-task-breakdown"
+      }
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "kind": "execution",
+      "prompt": "Requirements for the attached shipment-tracking story are approved. Produce its high-level design before we break it into tasks.",
+      "expected_output": "A Design section in the story spec covering scope, components, flows, data ownership, NFR mechanisms, and the shared contracts tasks depend on",
+      "files": [
+        "high-level-design"
+      ],
+      "expectations": [
+        "The design lists what is explicitly out of scope",
+        "Each flow is labelled synchronous or asynchronous, and the carrier-webhook ingestion path is treated separately from the customer read path",
+        "Every non-functional requirement is paired with a concrete mechanism and a way to verify it, not restated as a bare target",
+        "Shipment status changes are specified as a state-transition table that says what happens on an invalid or out-of-order transition",
+        "Duplicate carrier webhooks are handled by a stated idempotency rule",
+        "At least two design alternatives are compared and the chosen one is justified",
+        "Every design element traces back to a requirement id from the spec",
+        "No implementation code is written"
+      ]
+    }
+  ]
+}

@@ -147,7 +147,10 @@ Before looking at code, understand the intent:
 - What is this change trying to accomplish?
 - What spec or task does it implement?
 - What is the expected behavior change?
+- Is there a design to review against (the story's design or the task's low-level design note)?
 ```
+
+When a design exists, review the diff against it: every decided rule and failure branch is implemented, nothing undecided was added, and any divergence updated the design in the same change.
 
 ### Step 2: Review the Tests First
 

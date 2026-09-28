@@ -169,9 +169,11 @@ This lets you loop, retry, and problem-solve toward a clear goal rather than gue
 
 ### Phase 2: Plan
 
+If the change adds or reshapes components, or several tasks will share an API, a table, or a status field, produce the design first with the `high-level-design` skill and plan against the approved design.
+
 With the validated spec, generate a technical implementation plan:
 
-1. Identify the major components and their dependencies
+1. Identify the major components and their dependencies (take them from the approved design when one exists)
 2. Determine the implementation order (what must be built first)
 3. Note risks and mitigation strategies
 4. Identify what can be built in parallel vs. what must be sequential

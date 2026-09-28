@@ -26,6 +26,7 @@ Decompose work into small, verifiable tasks with explicit acceptance criteria. G
 Before writing any code, operate in read-only mode:
 
 - Read the spec and relevant codebase sections
+- Read the approved design if one exists; if the work shares contracts across tasks and no design exists, produce it first with the `high-level-design` skill
 - Identify existing patterns and conventions
 - Map dependencies between components
 - Note risks and unknowns
@@ -96,12 +97,16 @@ Each task follows this structure, whether it lands in the markdown task list or 
 
 **Dependencies:** [Task numbers this depends on, or "None"]
 
+**Design refs:** [Shared contract ids from the design this task builds on, e.g. C1, C3, or "None"]
+
 **Files likely touched:**
 - `src/path/to/file.ts`
 - `tests/path/to/test.ts`
 
 **Estimated scope:** [Small: 1-2 files | Medium: 3-5 files | Large: 5+ files]
 ```
+
+Don't write the task's internal design here. Just before a task is implemented, its low-level design note is added to the entry with the `low-level-design` skill.
 
 ### Step 5: Order and Checkpoint
 

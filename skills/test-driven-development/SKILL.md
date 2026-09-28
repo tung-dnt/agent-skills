@@ -50,6 +50,8 @@ The examples below use TypeScript for illustration; the workflow is identical in
 
 Write the test first. It must fail. A test that passes immediately proves nothing.
 
+If the task has a low-level design note (see `low-level-design`), its test list is your starting set of failing tests.
+
 ```typescript
 // RED: This test fails because createTask doesn't exist yet
 describe('TaskService', () => {

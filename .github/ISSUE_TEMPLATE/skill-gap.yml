@@ -27,9 +27,11 @@ body:
         - doubt-driven-development
         - frontend-ui-engineering
         - git-workflow-and-versioning
+        - high-level-design
         - idea-refine
         - incremental-implementation
         - interview-me
+        - low-level-design
         - observability-and-instrumentation
         - performance-optimization
         - planning-and-task-breakdown

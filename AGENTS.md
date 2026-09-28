@@ -24,7 +24,9 @@ OpenCode uses a **skill-driven execution model** powered by the `skill` tool and
 The agent should automatically map user intent to skills:
 
 - Feature / new functionality → `spec-driven-development`, then `incremental-implementation`, `test-driven-development`
+- System design / architecture for a story → `high-level-design`
 - Planning / breakdown → `planning-and-task-breakdown`
+- Designing one task before coding → `low-level-design`
 - Bug / failure / unexpected behavior → `debugging-and-error-recovery`
 - Code review → `code-review-and-quality`
 - Refactoring / simplification → `code-simplification`

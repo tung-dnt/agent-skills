@@ -41,6 +41,8 @@ For each slice:
 4. **Commit** -- save your progress with a descriptive message (see `git-workflow-and-versioning` for atomic commit guidance)
 5. **Move to the next slice** — carry forward, don't restart
 
+For a task with business rules, external calls, or concurrency, write its note with the `low-level-design` skill before the first slice, so the slices implement decisions instead of making them.
+
 ## Slicing Strategies
 
 ### Vertical Slices (Preferred)
