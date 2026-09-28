@@ -4,6 +4,13 @@
 
 Skills encode the workflows, quality gates, and best practices that senior engineers use when building software. These ones are packaged so AI agents follow them consistently across every phase of development.
 
+> **This is a fork** of [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills), maintained at [tung-dnt/agent-skills](https://github.com/tung-dnt/agent-skills). It adds:
+> - design skills (`high-level-design`, `low-level-design`) that give each scope of work (epic, story, task) its own workflow
+> - task files that are safe for parallel sessions, with git-lock claims and `/resume` after a closed session
+> - a multi-agent `/build auto` that routes each piece of work to the cheapest model tier that can do it well
+>
+> See [What this fork adds](#what-this-fork-adds).
+
 <a href="https://trendshift.io/repositories/25200" target="_blank"><img src="https://trendshift.io/api/badge/repositories/25200" alt="addyosmani%2Fagent-skills | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
 ![Addy's Agent Skills](https://addyosmani.com/assets/images/addys-agent-skills.jpg)
@@ -15,13 +22,14 @@ Skills encode the workflows, quality gates, and best practices that senior engin
  │Refine│      │  PRD │      │ Impl │      │Debug │      │ Gate │      │ Live │
  └──────┘      └──────┘      └──────┘      └──────┘      └──────┘      └──────┘
   /spec          /plan          /build        /test         /review       /ship
+                              /resume
 ```
 
 ---
 
 ## Commands
 
-9 slash commands that map to the development lifecycle. Each one activates the right skills automatically.
+10 slash commands that map to the development lifecycle. Each one activates the right skills automatically.
 
 | What you're doing | Command | Key principle |
 |-------------------|---------|---------------|
@@ -38,9 +46,51 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 
 Want fewer manual steps once the spec exists? **`/build auto`** generates the plan and implements every task in a single approved pass — you approve the plan once, then it runs autonomously. It removes the human stepping *between* tasks, not the verification: every task is still test-driven and committed individually, and it pauses on failures or risky steps.
 
-Several sessions can build one plan at once: `/plan` writes one file per task under `docs/stories/[story-id]/`, and `/build` claims a task with a git lock before starting, so two sessions never take the same task or edit the same file ([references/work-artifacts.md](references/work-artifacts.md)). The Claude Code plugin registers one SessionStart hook, `hooks/work-state.sh hint`. It prints a one-line `/resume` suggestion when claimed tasks exist, and nothing otherwise.
-
 Skills also activate automatically based on what you're doing — designing an API triggers `api-and-interface-design`, building UI triggers `frontend-ui-engineering`, and so on.
+
+---
+
+## What this fork adds
+
+### A workflow for each scope of work
+
+| Scope | Workflow | Produces |
+|---|---|---|
+| **Epic / project** | `interview-me` → `idea-refine` → `spec-driven-development` → `constraint-driven-development` → `high-level-design` (architecture) → `planning-and-task-breakdown` (story map) | Product requirements, `CONSTRAINTS.md`, ADRs, the story map |
+| **Story** | Spec with `FR`/`NFR` ids → `high-level-design` (system shape and shared contracts `C1…`) → fresh-context critique → `planning-and-task-breakdown` | `spec.md` with `## Design`, `plan.md`, one task file per task |
+| **Task / subtask** | `low-level-design` note → `test-driven-development` → `incremental-implementation` → `code-review-and-quality`, which checks the diff against the note | Design note, tests, one commit per task |
+
+A task that needs to change a shared contract escalates it to the story's design instead of changing it silently.
+
+### Artifacts that are safe for parallel sessions
+
+```
+docs/stories/[story-id]/
+  spec.md             requirements + ## Design          read-only after approval
+  plan.md             task index, order, design refs     read-only after approval
+  tasks/[task-id].md  status, design note, subtasks, log one writer: the claimer
+```
+
+- **Claims are git locks.** `/build` claims a task with the ref `claim/[story-id]/[task-id]`. It is created atomically, and published with an "only if it doesn't exist yet" push when there's a remote. Two sessions, worktrees, or machines never take the same task or edit the same file.
+- **`/resume` after a closed session.** A read-only investigator rebuilds the ticked tree (epics → stories → tasks → subtasks), finds where each claimed task stopped (including uncommitted work in worktrees), and recommends the next step.
+- **The docs location is resolved per project.** `/spec`, `/plan`, and `/build` detect an existing layout and propose a location in `.agent-skills.json`. They write it only after you confirm.
+- **`hooks/work-state.sh` does the git work**, so the model doesn't have to: `root`, `configure`, `next`, `claim`, `release`, `status`, `brief`, `hint`. It is covered by `hooks/work-state-test.sh`.
+- **One startup hook.** The Claude Code plugin registers a SessionStart hook (`work-state.sh hint`) that prints a one-line `/resume` suggestion when claimed tasks exist, and nothing otherwise.
+- **Claim locks are real branches.** Exclude `claim/**` from CI push triggers.
+
+Full layout and protocol: [references/work-artifacts.md](references/work-artifacts.md).
+
+### Multi-agent `/build auto` with model routing
+
+`/build auto` runs as a coordinator. It picks and claims independent tasks, then gives each one to a `task-builder` subagent in its own worktree, running in parallel (default 3, max 5). A `code-reviewer` checks each diff, and `security-auditor` joins when a task touches auth or sensitive data. Reviewed tasks are merged, and their claims are released. The main thread keeps only short summaries.
+
+| Tier | Model (Claude Code) | Runs |
+|---|---|---|
+| Deep | The model you selected for the main thread (`inherit`) | Dialogue with you, high-level design, design critique, security review, the retry after two failures |
+| Balanced | `sonnet` | Task builders, low-level design notes, code review of a task diff |
+| Fast | `haiku` | `/resume` investigation and other read-only work backed by scripts |
+
+In an end-to-end run on 4 tasks, three builders ran concurrently and all 26 tests passed. The run cost **$3.37**: $1.31 for the coordinator and $2.06 for the Sonnet builders and reviewers. The main context peaked at 90k tokens. Routing rules: [references/model-routing.md](references/model-routing.md).
 
 ---
 
@@ -49,21 +99,22 @@ Skills also activate automatically based on what you're doing — designing an A
 **Fastest path — any agent, one command.** The open [skills CLI](https://github.com/vercel-labs/skills) installs into 70+ agents (Claude Code, Cursor, Codex, Copilot, Cline, and more):
 
 ```bash
-npx skills add addyosmani/agent-skills            # install all 27 skills
-npx skills add addyosmani/agent-skills --list     # browse before installing
+npx skills add tung-dnt/agent-skills            # install all 27 skills
+npx skills add tung-dnt/agent-skills --list     # browse before installing
 ```
 
 Or grab individual skills:
 
 ```bash
-npx skills add addyosmani/agent-skills --skill code-review-and-quality   # five-axis review before merge
-npx skills add addyosmani/agent-skills --skill interview-me              # requirements interrogation, one question at a time
-npx skills add addyosmani/agent-skills --skill test-driven-development   # red-green-refactor, enforced
+npx skills add tung-dnt/agent-skills --skill code-review-and-quality   # five-axis review before merge
+npx skills add tung-dnt/agent-skills --skill interview-me              # requirements interrogation, one question at a time
+npx skills add tung-dnt/agent-skills --skill test-driven-development   # red-green-refactor, enforced
 ```
 
 > **Installing one skill?** A per-skill `npx` install copies only
 > `skills/<name>/`, not the repo-level `references/` directory. The skill still
-> works, but paths to supplementary shared checklists are unavailable. Use a
+> works, but paths to supplementary shared checklists are unavailable, and so is
+> `hooks/work-state.sh` (the reference describes the manual git fallback). Use a
 > whole-repo integration, clone the repository, or copy the needed checklist into
 > a `references/` directory inside the installed skill. This portability gap is
 > tracked in [#361](https://github.com/addyosmani/agent-skills/issues/361).
@@ -76,14 +127,22 @@ Prefer a native integration? Pick your tool below.
 **Marketplace install:**
 
 ```
-/plugin marketplace add addyosmani/agent-skills
-/plugin install agent-skills@addy-agent-skills
+/plugin marketplace add tung-dnt/agent-skills
+/plugin install agent-skills@tung-agent-skills
+```
+
+**Updating:** the plugin version stays in step with upstream (0.6.x), so `/plugin update` can report "already at the latest version" after new commits. Reinstall to pick them up:
+
+```bash
+claude plugin marketplace update tung-agent-skills
+claude plugin uninstall agent-skills@tung-agent-skills
+claude plugin install agent-skills@tung-agent-skills
 ```
 
 > **SSH errors?** The marketplace clones repos via SSH. If you don't have SSH keys set up on GitHub, either [add your SSH key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account) or use the full HTTPS URL to force HTTPS cloning during the marketplace-add step:
 > ```bash
-> /plugin marketplace add https://github.com/addyosmani/agent-skills.git
-> /plugin install agent-skills@addy-agent-skills
+> /plugin marketplace add https://github.com/tung-dnt/agent-skills.git
+> /plugin install agent-skills@tung-agent-skills
 > ```
 >
 > If `/plugin install` still fails with `git@github.com: Permission denied (publickey)` on Windows or macOS, the recommended workaround is to configure Git once to rewrite GitHub SSH URLs to HTTPS for subprocess clones:
@@ -94,7 +153,7 @@ Prefer a native integration? Pick your tool below.
 **Local / development:**
 
 ```bash
-git clone https://github.com/addyosmani/agent-skills.git
+git clone https://github.com/tung-dnt/agent-skills.git
 claude --plugin-dir /path/to/agent-skills
 ```
 
@@ -115,13 +174,13 @@ Install as a native plugin for skills and subagents. In affected Antigravity CLI
 **Install from the repo:**
 
 ```bash
-agy plugin install https://github.com/addyosmani/agent-skills.git
+agy plugin install https://github.com/tung-dnt/agent-skills.git
 ```
 
 **Install from a local clone:**
 
 ```bash
-git clone https://github.com/addyosmani/agent-skills.git
+git clone https://github.com/tung-dnt/agent-skills.git
 agy plugin install ./agent-skills
 ```
 
@@ -135,7 +194,7 @@ Install as native skills for auto-discovery, or add to `GEMINI.md` for persisten
 **Install from the repo:**
 
 ```bash
-gemini skills install https://github.com/addyosmani/agent-skills.git --path skills
+gemini skills install https://github.com/tung-dnt/agent-skills.git --path skills
 ```
 
 **Install from a local clone:**
@@ -182,7 +241,7 @@ Using the standalone `copilot` CLI? Install it as a plugin — see [docs/copilot
 Install as a native Codex plugin (Codex CLI v0.122+):
 
 ```bash
-codex plugin marketplace add addyosmani/agent-skills
+codex plugin marketplace add tung-dnt/agent-skills
 codex plugin add agent-skills@agent-skills
 ```
 
@@ -196,9 +255,9 @@ The first command registers the marketplace; the second installs the plugin. Cod
 Install natively with the built-in `cmd skills` command. Command Code clones the repo, discovers every `SKILL.md`, and installs into `.commandcode/skills/`:
 
 ```bash
-cmd skills add addyosmani/agent-skills            # pick skills to install (project)
-cmd skills add addyosmani/agent-skills --global   # install for all projects (~/.commandcode/skills/)
-cmd skills add addyosmani/agent-skills -s spec-driven-development  # install a specific skill
+cmd skills add tung-dnt/agent-skills            # pick skills to install (project)
+cmd skills add tung-dnt/agent-skills --global   # install for all projects (~/.commandcode/skills/)
+cmd skills add tung-dnt/agent-skills -s spec-driven-development  # install a specific skill
 ```
 
 Installed skills show up in the TUI slash menu, e.g. `/spec-driven-development`. See [docs/commandcode-setup.md](docs/commandcode-setup.md).
@@ -222,7 +281,7 @@ Already installed? How you roll the pack out depends on your codebase. The **[Ad
 
 ---
 
-## All 25 Skills
+## All 27 Skills
 
 The commands above are entry points. The pack includes 27 skills total — 26 lifecycle skills plus the `using-agent-skills` meta-skill. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
 
@@ -292,14 +351,16 @@ The commands above are entry points. The pack includes 27 skills total — 26 li
 
 ## Agent Personas
 
-Pre-configured specialist personas for targeted reviews:
+Pre-configured specialist personas for targeted reviews, plus two workers that the slash commands delegate to. Each agent declares its model tier (see [model-routing.md](references/model-routing.md)):
 
-| Agent | Role | Perspective |
-|-------|------|-------------|
-| [code-reviewer](agents/code-reviewer.md) | Senior Staff Engineer | Five-axis code review with "would a staff engineer approve this?" standard |
-| [test-engineer](agents/test-engineer.md) | QA Specialist | Test strategy, coverage analysis, and the Prove-It pattern |
-| [security-auditor](agents/security-auditor.md) | Security Engineer | Vulnerability detection, threat modeling, OWASP assessment |
-| [web-performance-auditor](agents/web-performance-auditor.md) | Web Performance Engineer | Core Web Vitals audit with Quick/Deep modes and a metric-honesty rule; run it via `/webperf` |
+| Agent | Role | Model | Perspective |
+|-------|------|-------|-------------|
+| [code-reviewer](agents/code-reviewer.md) | Senior Staff Engineer | sonnet | Five-axis code review with "would a staff engineer approve this?" standard |
+| [test-engineer](agents/test-engineer.md) | QA Specialist | sonnet | Test strategy, coverage analysis, and the Prove-It pattern |
+| [security-auditor](agents/security-auditor.md) | Security Engineer | inherit | Vulnerability detection, threat modeling, OWASP assessment |
+| [web-performance-auditor](agents/web-performance-auditor.md) | Web Performance Engineer | sonnet | Core Web Vitals audit with Quick/Deep modes and a metric-honesty rule; run it via `/webperf` |
+| [task-builder](agents/task-builder.md) | Implementer | sonnet | Builds one claimed task test-first in its own worktree; used by `/build auto` |
+| [state-investigator](agents/state-investigator.md) | Read-only investigator | haiku | Reconstructs where in-progress work stopped; used by `/resume` |
 
 See [docs/agents.md](docs/agents.md) for the decision matrix, orchestration rules, and how personas compose with skills and slash commands.
 
@@ -318,6 +379,8 @@ Quick-reference material that skills pull in when needed:
 | [accessibility-checklist.md](references/accessibility-checklist.md) | Keyboard nav, screen readers, visual design, ARIA, testing tools |
 | [observability-checklist.md](references/observability-checklist.md) | On-call questions, structured logging, RED/USE metrics, tracing, symptom-based alerting, pre-launch gate |
 | [orchestration-patterns.md](references/orchestration-patterns.md) | Endorsed multi-persona orchestration patterns, anti-patterns, and the "personas don't invoke personas" rule |
+| [work-artifacts.md](references/work-artifacts.md) | Per-story layout, task files, the git-lock claim protocol, root resolution, progress view, and resuming |
+| [model-routing.md](references/model-routing.md) | Model tiers, what gets delegated at each scope, the subagent output contract, parallel fan-out, and escalation |
 
 ---
 
@@ -359,13 +422,13 @@ The portable core stays in shared directories. Host-specific paths are native di
 | Layer / consumer | Repository paths | Purpose |
 |---|---|---|
 | Shared workflow core | `skills/` (27 skills) | Portable `SKILL.md` workflows used by every integration |
-| Shared review material | `agents/` (4 personas), `references/` (7 checklists) | Specialist reviewers and pack-level checklists carried by whole-repo installs |
-| Claude Code adapter | `.claude/commands/` (9 commands), `.claude-plugin/`, `hooks/` | Slash-command wrappers, marketplace metadata, and lifecycle hooks |
-| Gemini CLI adapter | `.gemini/commands/` (9 commands) | Gemini-native TOML command wrappers |
-| Antigravity CLI adapter | `commands/` (9 commands), `plugin.json` | Legacy TOML wrappers and the root plugin manifest; see the [known wrapper limitation](docs/antigravity-setup.md#lifecycle-workflows-and-command-compatibility) |
+| Shared review material | `agents/` (6 agents), `references/` (9 references) | Specialist reviewers, delegated workers, and pack-level references carried by whole-repo installs |
+| Claude Code adapter | `.claude/commands/` (10 commands), `.claude-plugin/`, `hooks/` | Slash-command wrappers, marketplace metadata, lifecycle hooks, and `work-state.sh` |
+| Gemini CLI adapter | `.gemini/commands/` (10 commands) | Gemini-native TOML command wrappers |
+| Antigravity CLI adapter | `commands/` (10 commands), `plugin.json` | Legacy TOML wrappers and the root plugin manifest; see the [known wrapper limitation](docs/antigravity-setup.md#lifecycle-workflows-and-command-compatibility) |
 | Codex adapter | `.codex-plugin/`, `.agents/plugins/` | Codex plugin metadata and marketplace registration; Codex consumes `skills/` directly |
 | GitHub Copilot CLI adapter | `plugin.json` | Root plugin metadata; Copilot CLI discovers `skills/` by convention and does not register the lifecycle wrappers |
-| Contributor tooling | `scripts/` (13 scripts), `evals/` (25 case files), `.github/workflows/` | Validation, routing evals, and CI |
+| Contributor tooling | `scripts/` (13 scripts), `evals/` (27 case files), `.github/workflows/` | Validation, routing evals, and CI |
 | Documentation | `docs/` | Universal guidance and per-tool setup guides |
 
 Tools without a checked-in adapter directory install or copy the shared `skills/` core into their own native location. The [Quick Start](#quick-start) links the setup guide for each supported host.
@@ -405,6 +468,8 @@ agent-skills is built and maintained by:
 | <img src="https://github.com/addyosmani.png?size=120" width="60" height="60" alt="Addy Osmani"> | **Addy Osmani** | [@addyosmani](https://github.com/addyosmani) | Creator |
 | <img src="https://github.com/federicobartoli.png?size=120" width="60" height="60" alt="Federico Bartoli"> | **Federico Bartoli** | [@federicobartoli](https://github.com/federicobartoli) | Collaborator |
 | <img src="https://github.com/nucliweb.png?size=120" width="60" height="60" alt="Joan León"> | **Joan León** | [@nucliweb](https://github.com/nucliweb) | Collaborator |
+
+This fork is maintained by [@tung-dnt](https://github.com/tung-dnt).
 
 ---
 
