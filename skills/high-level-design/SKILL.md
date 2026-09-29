@@ -101,7 +101,7 @@ For each item below, write it down only if **more than one task** depends on it.
 
 ### Step 11: Alternatives and decision
 
-Compare at least two viable designs for the decisions that are expensive to reverse (sync versus async, new store versus existing, build versus buy). State the tradeoff in terms of the NFRs. Record each chosen decision as an ADR using `documentation-and-adrs`.
+Put each decision that is expensive to reverse (sync versus async, new store versus existing, build versus buy) to the user as a decision brief (`../../references/approval-gate.md`): at least two viable designs, their pros and cons measured against the NFRs, effort, reversibility, what the choice hinges on, and when you'd choose differently. Record each chosen decision as an ADR using `documentation-and-adrs`, including the rejected options and why they lost.
 
 ### Step 12: Doubt, then human approval
 

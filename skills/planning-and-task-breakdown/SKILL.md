@@ -125,6 +125,8 @@ Add each checkpoint to the task list target as a task of its own, depending on t
 - [ ] Review with human before proceeding
 ```
 
+**Planning choices are trade-offs too.** When the slicing or order has real alternatives, put each to the user at the plan gate as a decision brief (`../../references/approval-gate.md`) instead of deciding silently. Typical ones: risk-first vs value-first order, one PR vs several, parallel vs sequential tasks, reuse vs build.
+
 Before any task is built, the plan passes the approval gate (`../../references/approval-gate.md`): a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead.
 
 ## Task Sizing Guidelines

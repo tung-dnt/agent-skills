@@ -34,6 +34,8 @@ Use this template, in plain language. No call stacks or code dumps; link `file:l
 
 **Recommendation:** The course of action this gate approves (the design, plan, or approach) and why. 1–2 lines.
 
+**Trade-offs:** What the recommendation gives up (cost, risk, flexibility), and the strongest alternative with the reason it lost. 1–2 lines.
+
 **Open decisions:** What still needs a human call. Omit if none.
 ```
 
@@ -43,9 +45,29 @@ This follows the report format of the `investigate-first` workflow, so investiga
 
 ### 2. Grill
 
-Run the `grill-me` skill over the open decisions: rounds of numbered questions with recommended answers, working the design tree until the frontier is empty. Use its round format exactly (`❓ **Q1** - **<title>**: <question>`, then `➡️ <recommended answer>`, with `---` between questions) so every gate reads the same. Look up facts yourself (or with a read-only subagent); put only decisions to the user.
+Run the `grill-me` skill over the open decisions: rounds of numbered questions with recommended answers, working the design tree until the frontier is empty. Look up facts yourself (or with a read-only subagent); put only decisions to the user.
 
-**Ask the approach, not just the details.** For a bug, or any change where more than one approach is plausible, the first round includes an approach question. List at least two alternatives with a one-line tradeoff each, plus your recommendation. For example: "copy the vendor files into the repo" vs "install and bundle them". Never pick the approach silently.
+**Every decision question is a decision brief**, so the user can weigh it rather than just accept a recommendation:
+
+```
+❓ **Q1 - <decision>**: <what's being decided, and why it matters now: 1–2 sentences>
+
+| Option | How it works | Pros | Cons / risks | Effort | Reversible |
+|---|---|---|---|---|---|
+| A <name> | … | … | … | S / M / L | easy / hard, and why |
+| B <name> | … | … | … | … | … |
+
+**Hinges on:** the one or two facts or priorities that decide it, tied to a requirement, constraint, or NFR. Never another open question: a question that depends on one waits for a later round.
+
+➡️ **<option>**: why it wins on what it hinges on. **Choose <other> instead if** <the condition that would flip it>.
+```
+
+- At least two real options. Include "do nothing" or "defer" when that's genuinely viable.
+- Fill the cells with evidence: measured, looked up, or quoted from the code or spec. Mark guesses `(est.)`.
+- The "choose … instead if" line is required. It tells the user which assumption the recommendation rests on.
+- Only the closing "Proceed?" question skips the table.
+
+**Ask the approach, not just the details.** For a bug, or any change where more than one approach is plausible, the first round includes the approach as a decision brief. For example: "copy the vendor files into the repo" vs "install and bundle them", compared on effort, risk, and reversibility. Never pick the approach silently.
 
 **Every gate asks at least one question.** When nothing is open, the round is a single question, "Proceed with this <spec | design | plan | task>?", with your recommended answer. A gate never passes silently.
 

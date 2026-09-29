@@ -10,16 +10,25 @@ Work the tree in **rounds**. The **frontier** is every decision whose prerequisi
 Format a round like so:
 
 ```
-❓ **Q1** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
+❓ **Q1** - **<question title>**: <question body: what's being decided and why it matters now>
 
-➡️ <your recommended answer>
+| Option | How it works | Pros | Cons / risks | Effort | Reversible |
+|---|---|---|---|---|---|
+| A <name> | … | … | … | S / M / L | easy / hard, and why |
+| B <name> | … | … | … | … | … |
+
+**Hinges on:** <the one or two facts or priorities that decide it>
+
+➡️ <your recommended answer, and why it wins on what it hinges on>. **Choose <other> instead if** <the condition that would flip it>.
 
 ---
 
-❓ **Q2** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
+❓ **Q2** - **<question title>**: <question body>
 
-➡️ <your recommended answer>
+<options table, hinges on, recommendation, as above>
 ```
+
+Every question gets the trade-off table, with at least two real options, cells backed by evidence (guesses marked "(est.)"), and the condition that would flip your recommendation. The user should be able to disagree with you from the table alone. A plain yes/no confirmation ("Proceed?") is the only exception. **Hinges on** names facts or priorities, never another open question. If a question hinges on an answer you haven't heard yet, it belongs to a later round.
 
 Each round the user answers reshapes the tree: settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
 
