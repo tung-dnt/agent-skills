@@ -73,6 +73,8 @@ A task that needs to change a shared contract escalates it to the story's design
 2. **`grill-me` rounds** over the open decisions. Every gate asks at least one question.
 3. Your **explicit go-ahead**. `/build auto` holds one gate over the whole plan and every design note, then runs autonomously.
 
+**You see each step as it's done.** Before the gate, `/task` and `/story` stop at a **step checkpoint** after the investigation and after every high-level and low-level design step. Each checkpoint shows what the step produced and asks about its decision, or "Continue?", so you approve the design piece by piece instead of all at once at the end. Say "don't stop" to skip the checkpoints; the gate stays.
+
 ### Artifacts that are safe for parallel sessions
 
 ```

@@ -13,6 +13,24 @@ The one checkpoint every planning, design, and build workflow passes before work
 | `/task`, `/build`, `low-level-design` | The task's design note | Building the task |
 | `/build auto` | The whole plan **and** every task's design note, once | The first wave |
 
+## Step Checkpoints
+
+Before the gate, smaller stops keep the user with the work as it's produced, instead of meeting it all at once in a final plan. Stop at a checkpoint:
+
+- after an investigation (in `/task`, for bugs and unknown causes)
+- after each step of `high-level-design` (steps 1–11) and `low-level-design` (steps 1–6)
+
+At each checkpoint:
+
+1. **Show what the step produced:** the section just written, verbatim, or for an investigation the root cause and its evidence. Keep it to 15 lines or fewer, and lead with a one-line header: `Step N/M — <step name>`.
+2. **Ask.** Put any decision the step raised to the user as a decision brief (see Grill below). If nothing is open, ask one question, "Continue to step N+1 (<name>)?", with your recommended answer. For an investigation, ask "Is this the right cause to design against?"
+3. **Wait** for the reply. When it changes the step, revise that step and show it again. Never write the next step on an unconfirmed one.
+4. **Keep the progress in the artifact.** The text written so far is the progress, so a resumed session continues at the first step not yet written. At task scope, add a `## Log` line per confirmed step.
+
+A checkpoint is lighter than the gate: no catch-up summary and no record. The gate still runs at the end of the design over the whole result. Its grill asks only what is still open, plus "Proceed?". Never re-ask what a checkpoint already settled.
+
+A checkpoint holds the user's attention, so it needs the main thread. Subagents can read, investigate, and critique between checkpoints, but the main thread writes each design step.
+
 ## The Three Steps
 
 ### 1. Catch-up summary
@@ -81,7 +99,7 @@ Continue only on an explicit go-ahead. A hedged reply ("looks fine I guess") is 
 
 - **Nothing is built on an unapproved design.** Before any build, the orchestrator runs `work-state.sh approved`. The `task-builder` checks it again, and reports `blocked` on a non-zero exit.
 - **Existing work gets a gate too.** If code or commits already exist for a task that isn't approved (built in an earlier session, by hand, or before these rules), don't continue straight to review, push, PR, merge, or a tracker comment. First write the design note describing what was built and what should change, then run the gate on it, with the approach question if another approach was possible.
-- **"Don't stop" means batch, not skip.** When the user says "just build it", "don't stop", or "no questions", don't drop the design. Switch to batch mode instead: draft every missing note, run one gate over all of them (a combined summary plus every note), `approve` each task, then build without further stops. `/build auto` works this way.
+- **"Don't stop" means batch, not skip.** When the user says "just build it", "don't stop", or "no questions", don't drop the design. Switch to batch mode instead: skip the step checkpoints, draft every missing note in one pass (subagents may draft), run one gate over all of them (a combined summary plus every note), `approve` each task, then build without further stops. `/build auto` works this way.
 
 ## Subagents Can't Hold a Gate
 

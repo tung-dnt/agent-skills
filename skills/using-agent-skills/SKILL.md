@@ -145,7 +145,7 @@ These are the subtle errors that look like productivity but create problems:
 
 4. **When in doubt, start with a spec.** If the task is non-trivial and there's no spec, begin with `spec-driven-development`.
 
-5. **Confirm before work starts.** Every spec, design, plan, and task passes the approval gate (`../../references/approval-gate.md`) before anything is built: a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead. No gate passes silently.
+5. **Confirm before work starts.** Every spec, design, plan, and task passes the approval gate (`../../references/approval-gate.md`) before anything is built: a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead. No gate passes silently. Before the gate, investigations and every design step stop at a step checkpoint, so the user confirms the work as it's produced, not only the final result.
 
 ## Lifecycle Sequence
 

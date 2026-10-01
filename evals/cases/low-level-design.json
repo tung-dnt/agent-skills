@@ -34,7 +34,7 @@
     {
       "id": 1,
       "kind": "execution",
-      "prompt": "Task t02-apply-event in story shipment-tracking is next. Write its low-level design note before implementing it.",
+      "prompt": "Task t02-apply-event in story shipment-tracking is next. Write its low-level design note before implementing it, in one pass; I'll review the whole note at the end.",
       "expected_output": "A short design note in the ## Design section of the t02 task file: edge contracts, invariants, flow with failure branches, failure policy, security line, observability line, and the test cases they imply",
       "files": [
         "low-level-design"
@@ -48,6 +48,21 @@
         "Each edge case and failure rule in the note maps to at least one listed test case",
         "Any change to a shared table or contract is escalated rather than silently designed into the task",
         "No implementation code is written"
+      ]
+    },
+    {
+      "id": 2,
+      "kind": "execution",
+      "prompt": "Task t02-apply-event in story shipment-tracking is next. Let's work out its low-level design together, step by step.",
+      "expected_output": "Step 1 only: the facts the design will rest on (cited contract ids, code paths, patterns), then a stop that asks the user to confirm before step 2",
+      "files": [
+        "low-level-design"
+      ],
+      "expectations": [
+        "The response is headed as step 1 of the low-level design (for example 'Step 1/6') and shows what that step found: the shared contract ids the task cites (such as C3, C4, C6) and the code or files it will touch",
+        "It stops after step 1 and asks the user a question before continuing (a decision brief or 'Continue to step 2?'), with a recommended answer",
+        "It does not write the later parts of the design yet: no failure-branch flow, cross-cutting lines, or test list appear in the response or in the task file's ## Design section",
+        "No implementation code is written and plan.md is not modified"
       ]
     }
   ]

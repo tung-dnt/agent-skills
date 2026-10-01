@@ -34,7 +34,7 @@
     {
       "id": 1,
       "kind": "execution",
-      "prompt": "Requirements for the attached shipment-tracking story are approved. Produce its high-level design before we break it into tasks.",
+      "prompt": "Requirements for the attached shipment-tracking story are approved. Produce its high-level design in one pass, before we break it into tasks; I'll review it all at the end.",
       "expected_output": "A Design section in the story spec covering scope, components, flows, data ownership, NFR mechanisms, and the shared contracts tasks depend on",
       "files": [
         "high-level-design"

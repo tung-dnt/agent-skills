@@ -33,6 +33,8 @@ Everything local to a single task — internal functions, local edge cases — i
 
 Work top-down. Finish the shape layer before the contracts layer; contracts written before the shape is agreed get rewritten.
 
+**Stop after each of steps 1–11 at a step checkpoint** (`../../references/approval-gate.md`): show what the step produced (the section, or for step 1 the FR and NFR ids and the existing components you'll build on), ask about any decision it raised as a decision brief, otherwise ask "Continue to step N+1?", and wait. Write each confirmed section into `## Design` before starting the next, so a later step never rests on an unconfirmed one. Skip the checkpoints only when the user asked for one pass ("don't stop", "draft it in one go"); then step 12's gate is the only stop.
+
 ### Step 1: Load inputs and read what exists
 
 - Read the spec. Give every functional requirement and non-functional requirement a stable id (`FR1`, `NFR1`) if it lacks one; the design traces back to these.
@@ -105,7 +107,7 @@ Put each decision that is expensive to reverse (sync versus async, new store ver
 
 ### Step 12: Doubt, then human approval
 
-Run the design through `doubt-driven-development` with the spec as the contract, on the deep tier (the main thread's model), in a fresh context: a fresh-context reviewer looks for requirements with no design element, NFRs with no mechanism, and failure paths nobody owns. Fold the findings back in, then pass the approval gate (`../../references/approval-gate.md`): a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead. Tasks are planned only against an approved design.
+Run the design through `doubt-driven-development` with the spec as the contract, on the deep tier (the main thread's model), in a fresh context: a fresh-context reviewer looks for requirements with no design element, NFRs with no mechanism, and failure paths nobody owns. Fold the findings back in, then pass the approval gate (`../../references/approval-gate.md`): a catch-up summary, `grill-me` rounds over the decisions still open (never re-ask what a checkpoint settled), and the user's explicit go-ahead. Tasks are planned only against an approved design.
 
 ## Output
 
