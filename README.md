@@ -6,7 +6,7 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 
 > **This is a fork** of [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills), maintained at [tung-dnt/agent-skills](https://github.com/tung-dnt/agent-skills). It adds:
 > - design skills (`high-level-design`, `low-level-design`) that give each scope of work (epic, story, task) its own workflow
-> - task files that are safe for parallel sessions, with git-lock claims and `/resume` after a closed session
+> - task notes in the Obsidian project-manager format, safe for parallel sessions, with git-lock claims and `/resume` after a closed session
 > - a multi-agent `/build auto` that routes each piece of work to the cheapest model tier that can do it well
 >
 > See [What this fork adds](#what-this-fork-adds).
@@ -63,13 +63,13 @@ Skills also activate automatically based on what you're doing — designing an A
 | Scope | Workflow | Produces |
 |---|---|---|
 | **Epic / project** | `interview-me` → `idea-refine` → `spec-driven-development` → `constraint-driven-development` → `high-level-design` (architecture) → `planning-and-task-breakdown` (story map) | Product requirements, `CONSTRAINTS.md`, ADRs, the story map |
-| **Story** | Spec with `FR`/`NFR` ids → `high-level-design` (system shape and shared contracts `C1…`) → fresh-context critique → `planning-and-task-breakdown` | `spec.md` with `## Design`, `plan.md`, one task file per task |
-| **Task / subtask** | `low-level-design` note → `test-driven-development` → `incremental-implementation` → `code-review-and-quality`, which checks the diff against the note | Design note, tests, one commit per task |
+| **Story** | Spec with `FR`/`NFR` ids → `high-level-design` (system shape and shared contracts `C1…`) → fresh-context critique → `planning-and-task-breakdown` | `spec.md` with `## Design`, `plan.md`, one task note per task |
+| **Task** | `low-level-design` note → `test-driven-development` → `incremental-implementation` → `code-review-and-quality`, which checks the diff against the note | Design note, tests, one commit per task |
 
 A task that needs to change a shared contract escalates it to the story's design instead of changing it silently.
 
 **Nothing starts without your go-ahead.** Every spec, design, plan, and task passes one approval gate ([references/approval-gate.md](references/approval-gate.md)):
-1. A one-screen **catch-up summary**: Business context · Proposed fix fit · Root cause (bugs) · Recommendation · Open decisions. It is also saved to `docs/stories/[story-id]/summary.md`, or to the task file's `## Summary`.
+1. A one-screen **catch-up summary**: Business context · Proposed fix fit · Root cause (bugs) · Recommendation · Open decisions. It is also saved to `[stories-dir]/[story-id]/summary.md`, or to the task note's `## Summary`.
 2. **`grill-me` rounds** over the open decisions. Every gate asks at least one question.
 3. Your **explicit go-ahead**. `/build auto` holds one gate over the whole plan and every design note, then runs autonomously.
 
@@ -78,16 +78,20 @@ A task that needs to change a shared contract escalates it to the story's design
 ### Artifacts that are safe for parallel sessions
 
 ```
-docs/stories/[story-id]/
-  spec.md             requirements + ## Design          read-only after approval
-  plan.md             task index, order, design refs     read-only after approval
-  tasks/[task-id].md  status, design note, subtasks, log one writer: the claimer
+[stories-dir]/[story-id]/
+  [story-id].md         Obsidian project note, made by `work-state.sh init-story`
+  spec.md               requirements + ## Design          read-only after approval
+  plan.md               task index, order, design refs     read-only after approval
+  _tasks/[task-id].md   task note: status, design note, checklist, log   one writer: the claimer
 ```
 
-- **Claims are git locks.** `/build` claims a task with the ref `claim/[story-id]/[task-id]`. It is created atomically, and published with an "only if it doesn't exist yet" push when there's a remote. Two sessions, worktrees, or machines never take the same task or edit the same file.
-- **`/resume` after a closed session.** A read-only investigator rebuilds the ticked tree (epics → stories → tasks → subtasks), finds where each claimed task stopped (including uncommitted work in worktrees), and recommends the next step.
-- **The docs location is resolved per project.** `/spec`, `/plan`, and `/build` detect an existing layout and propose a location in `.agent-skills.json`. They write it only after you confirm.
-- **`hooks/work-state.sh` does the git work**, so the model doesn't have to: `root`, `configure`, `next`, `claim`, `release`, `status`, `brief`, `hint`. It is covered by `hooks/work-state-test.sh`.
+Task and project notes use the note format of the Obsidian **project-manager** plugin ("dotpm"), so they show up in its boards when the store is a vault. Agents create and change them only through `work-state.sh` (`new-task`, `field`, `set`, `log`, `claim`, `approve`), and edit just the note body: the task description, `## Design`, `## Summary`, and the `## Checklist` ticks. Epics get a project note of their own (`[epics-dir]/[epic-id]/[epic-id].md`, made by `init-epic`); a story's project note links to its epic.
+
+- **Where the notes live.** `work-state.sh root` resolves a store: `vault` or `repo`. When your Obsidian vault is configured, the vault is the store: `~/.config/agent-skills/config.json` (or `$AGENT_SKILLS_CONFIG`) holds `{"vault": "/abs/path"}` and, optionally, `projectsFolder`, and the omp-starter knowledge-base step writes it. Notes then go to `<vault>/<projectsFolder>/<vaultFolder>/stories` and `…/epics`; `projectsFolder` defaults to the project-manager plugin's setting, then `Projects`. Without a vault, the store is the repo: `docs/stories` and `docs/epics`. `.agent-skills.json` can force the choice with `"store": "vault" | "repo"` and name the vault folder with `"vaultFolder": "group/name"` (default: the repo name, so every worktree of a repo shares one folder). Its `storiesDir` and `epicsDir` keys still set the repo-store directories.
+- **Claims are git locks.** `/build` claims a task with the ref `claim/[story-id]/[task-id]`. It is created atomically, and published with an "only if it doesn't exist yet" push when there's a remote. Two sessions, worktrees, or machines never take the same task or edit the same file. `claim` then sets the task to `in-progress` and records its work branch. A vault has a single copy of each note and no git history for it, so there `next` also waits for a dependency's claim to be released, which happens once its work is merged.
+- **`/resume` after a closed session.** A read-only investigator rebuilds the ticked tree (epics → stories → tasks → checklist items), finds where each claimed task stopped (including uncommitted work in worktrees), and recommends the next step.
+- **The repo-store location is resolved per project.** With no vault, `/spec`, `/plan`, and `/build` detect an existing layout and propose a location in `.agent-skills.json`. They write it only after you confirm. A repository that still has the old `tasks/` layout converts it with `work-state.sh migrate`.
+- **`hooks/work-state.sh` does the git work and keeps the notes valid**, so the model doesn't have to: `root`, `configure`, `init-epic`, `init-story`, `new-task`, `path`, `field`, `set`, `log`, `phase`, `approve`, `approved`, `next`, `claim`, `release`, `status`, `brief`, `migrate`, `hint`. It is covered by `hooks/work-state-test.sh`.
 - **One startup hook.** The Claude Code plugin registers a SessionStart hook (`work-state.sh hint`) that prints a one-line `/resume` suggestion when claimed tasks exist, and nothing otherwise.
 - **Claim locks are real branches.** Exclude `claim/**` from CI push triggers.
 
@@ -393,7 +397,7 @@ Quick-reference material that skills pull in when needed:
 | [accessibility-checklist.md](references/accessibility-checklist.md) | Keyboard nav, screen readers, visual design, ARIA, testing tools |
 | [observability-checklist.md](references/observability-checklist.md) | On-call questions, structured logging, RED/USE metrics, tracing, symptom-based alerting, pre-launch gate |
 | [orchestration-patterns.md](references/orchestration-patterns.md) | Endorsed multi-persona orchestration patterns, anti-patterns, and the "personas don't invoke personas" rule |
-| [work-artifacts.md](references/work-artifacts.md) | Per-story layout, task files, the git-lock claim protocol, root resolution, progress view, and resuming |
+| [work-artifacts.md](references/work-artifacts.md) | Per-story layout, task notes, the git-lock claim protocol, store resolution (vault or repo), progress view, and resuming |
 | [approval-gate.md](references/approval-gate.md) | The one gate before work starts: catch-up summary format, `grill-me` rounds, explicit go-ahead, and where each gate sits |
 | [model-routing.md](references/model-routing.md) | Model tiers, what gets delegated at each scope, the subagent output contract, parallel fan-out, and escalation |
 

@@ -1,10 +1,7 @@
----
-epic: shipments
----
 # Plan: Shipment tracking
 
 ## Task Index
-Status lives in each task file, never here.
+Status lives in each task note, never here.
 
 | Id | Task | Depends on | Design refs |
 |----|------|------------|-------------|

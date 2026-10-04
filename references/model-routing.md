@@ -19,7 +19,7 @@ The main thread runs on whatever model the user selected. Routing never override
 | Tier | Runs on | Use for |
 |---|---|---|
 | **Deep** | The main thread's model (`inherit`) | Dialogue with the user (interviews, approvals), high-level design, fresh-context critique of a design, security review of authentication, authorization, or sensitive data, and the retry after a balanced-tier failure |
-| **Balanced** | A mid-size model (Claude Code: `sonnet`) | Building a task that has a low-level design note, writing that note, reviewing one task's diff, drafting ADRs, writing task files from an approved design |
+| **Balanced** | A mid-size model (Claude Code: `sonnet`) | Building a task that has a low-level design note, writing that note, reviewing one task's diff, drafting ADRs, creating task notes from an approved design |
 | **Fast** | A small model (Claude Code: `haiku`) | Read-only work backed by scripts: `/resume` investigation, codebase search, running tests and triaging their output, collecting status, drafting commit and PR text |
 
 In Claude Code the tier is the `model:` field in an agent's frontmatter, or the model passed when spawning a subagent. Hosts without per-agent models run every tier on the main model; the delegation structure still saves context.
@@ -29,7 +29,7 @@ In Claude Code the tier is the `model:` field in an agent's frontmatter, or the 
 | Scope | Stays in the main thread | Delegated |
 |---|---|---|
 | Epic | Interview (subagents can't ask the user), product requirements, story map | Architecture and codebase discovery (fast) · parallel option generation for `idea-refine` (balanced) · critique of the requirements (deep, fresh context) |
-| Story | Requirements, the `## Design` itself, approval gates | Reading the existing architecture (fast) · `doubt-driven-development` critique (deep, fresh context) · writing task files from the approved design (balanced) |
+| Story | Requirements, the `## Design` itself, approval gates | Reading the existing architecture (fast) · `doubt-driven-development` critique (deep, fresh context) · creating task notes from the approved design (balanced) |
 | Task | A thin loop: pick, claim, delegate, collect | `task-builder` per claimed task (balanced), in parallel for independent tasks · `code-reviewer` per diff (balanced) · `security-auditor` when the task touches auth or sensitive data (deep) |
 | Resume | Presenting the result and asking which task to continue | `state-investigator` (fast, read-only) |
 

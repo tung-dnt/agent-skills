@@ -4,25 +4,38 @@ Where specs, designs, plans, and task state live, and how several agent sessions
 
 ## The Problem This Solves
 
-A single shared plan and checklist works for one session. With several sessions — each in its own worktree, or several in one checkout — a shared file breaks: two sessions pick the same "next pending" task, both edit the same checklist, and worktree copies of it diverge and conflict on merge.
+A single shared plan and checklist works for one session. With several sessions — each in its own worktree, or several in one checkout — a shared file breaks: two sessions pick the same "next todo" task, both edit the same checklist, and worktree copies of it diverge and conflict on merge.
 
 The fix is to separate **artifacts** (decided once, then read) from **work state** (written continuously, one owner per file).
 
-## Resolving the Artifact Root
+## Resolving the Store
 
-The paths below use the defaults `docs/stories` and `docs/epics`. A project can choose other directories, and a first clone may already use its own layout, so resolve the root before reading or writing any artifact:
+Work state lives in one of two stores, and both use the same note format (see Task Note below):
+
+- **Vault store:** the user's Obsidian vault, when one is configured. The vault is where the Obsidian project-manager plugin ("dotpm") shows stories and tasks as projects and tasks.
+- **Repo store:** the repository itself, under `docs/stories` and `docs/epics` by default.
+
+Resolve the store before reading or writing any artifact:
 
 ```
 bash [plugin-root]/hooks/work-state.sh root
 ```
 
-`hooks/work-state.sh` ships with the agent-skills plugin: it sits at the plugin root, next to this `references/` directory (`${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh` in Claude Code), not in your project. Run it from inside the project. Where the script isn't available, apply the same order by hand. It prints `stories_dir`, `epics_dir`, `configured`, and `source`, plus `notes` for anything it found. It resolves in this order:
+`hooks/work-state.sh` ships with the agent-skills plugin: it sits at the plugin root, next to this `references/` directory (`${CLAUDE_PLUGIN_ROOT}/hooks/work-state.sh` in Claude Code), not in your project. Run it from inside the project. It prints `store` (`vault` or `repo`), `repo_root`, `stories_dir` and `epics_dir` (both absolute), `configured`, and `source`, plus `vault` (vault store only) and `notes` for anything it found. Everything below writes `[stories-dir]` and `[epics-dir]` for the printed directories; in the repo store with no config those are `docs/stories` and `docs/epics`.
 
-1. `.agent-skills.json` at the repository root: `{"storiesDir": "…", "epicsDir": "…"}`. Every worktree reads the same committed file.
-2. No config, but `docs/stories` or `docs/epics` exists: use them (`source=detected`).
-3. Neither: the defaults (`source=default`). The notes list anything that looks like another convention: `specs/`, `docs/specs/`, `openspec/`, or a legacy `tasks/plan.md`.
+The store resolves in this order:
 
-When `configured=false`, **propose** a location to the user, using the notes (for example "this repo keeps specs in `specs/`; use `specs/stories`?"). Write the config only after they confirm, with `bash [plugin-root]/hooks/work-state.sh configure <storiesDir> [epicsDir]`, and commit it. Never write it silently. After that, every command and session uses the resolved directories wherever this document says `docs/stories` or `docs/epics`.
+1. `.agent-skills.json` at the repository root (committed, so every worktree reads the same file) with `"store": "vault" | "repo"` forces a store. `vault` without a configured vault is an error.
+2. Otherwise the vault store, when the user-level config `${AGENT_SKILLS_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/agent-skills/config.json}` has a `vault` that exists: `{"vault": "/abs/vault/root"}`, optionally with `"projectsFolder"`. That file is per machine and never committed; the omp-starter knowledge-base step writes it.
+3. Otherwise the repo store.
+
+In the vault store, `[stories-dir]` is `<vault>/<projectsFolder>/<vaultFolder>/stories` and `[epics-dir]` is `…/epics`. `projectsFolder` comes from the user config, then the vault's project-manager plugin settings, then `Projects`. `vaultFolder` comes from `.agent-skills.json` (`"vaultFolder": "group/name"`) and defaults to the repo name (the basename of the main worktree, so every worktree of a repo maps to the same folder).
+
+In the repo store, `.agent-skills.json` can also set `{"storiesDir": "…", "epicsDir": "…"}`. Without it, `docs/stories` or `docs/epics` is used when it exists (`source=detected`), otherwise the defaults (`source=default`). The notes list anything that looks like another convention: `specs/`, `docs/specs/`, `openspec/`, a legacy `tasks/plan.md`, or the older `tasks/` layout (run `work-state.sh migrate` to convert it into the resolved store).
+
+When `store=repo` and `configured=false`, **propose** a location to the user, using the notes (for example "this repo keeps specs in `specs/`; use `specs/stories`?"). Write the config only after they confirm, with `bash [plugin-root]/hooks/work-state.sh configure <storiesDir> [epicsDir]`, and commit it. Never write it silently. With `store=vault` there is nothing to propose: the vault path comes from the user config.
+
+Where the script isn't available (another agent host, or a per-skill install), apply the same order by hand.
 
 ## Scopes and Commands
 
@@ -30,9 +43,9 @@ Every piece of work belongs to one scope, and each scope has one entry command. 
 
 | Scope | Command | Owns | Hands off to |
 |---|---|---|---|
-| Epic / project | `/epic` | `docs/epics/[epic-id]/epic.md` (or `SPEC.md` for a whole product), `CONSTRAINTS.md`, architecture ADRs, story stubs | `/story` |
-| Story | `/story` | `docs/stories/[story-id]/spec.md` with `## Design`, `plan.md`, task files | `/task` or `/build auto` |
-| Task / subtask | `/task` | One task file's `## Design`, `## Subtasks`, `## Log`, and that task's code | The next task |
+| Epic / project | `/epic` | `[epics-dir]/[epic-id]/epic.md` (or `SPEC.md` for a whole product), `CONSTRAINTS.md`, architecture ADRs, story stubs | `/story` |
+| Story | `/story` | `[stories-dir]/[story-id]/spec.md` with `## Design`, `plan.md`, task notes | `/task` or `/build auto` |
+| Task / subtask | `/task` | One task note's `## Design`, `## Checklist`, `## Log`, and that task's code | The next task |
 
 ### Scope check
 
@@ -56,28 +69,35 @@ If the signals point to a different scope from the command that was run, say so 
 | `none` | No story folder | Write the spec |
 | `spec` | Folder without `spec.md` | Write the spec |
 | `design` | Spec without a `## Design` section, and no plan yet | High-level design. A story that already has a plan is past this phase: small stories may skip it. |
-| `plan` | No `plan.md`, or no task files | Plan the tasks |
-| `build` | Some task isn't `done` (`open_tasks=N`) | `/task` or `/build auto` |
-| `done` | Every task is `done` | Review the story as a whole, then ship |
+| `plan` | No `plan.md`, or no task notes | Plan the tasks |
+| `build` | Some task isn't complete (`open_tasks=N`) | `/task` or `/build auto` |
+| `done` | Every task is complete (`done` or `cancelled`) | Review the story as a whole, then ship |
 
 ## Layout
 
-```
-docs/epics/[epic-id]/
-  epic.md             Product requirements and the story map: ordered stories with rough acceptance criteria
+The layout is the same in both stores:
 
-docs/stories/[story-id]/
+```
+[epics-dir]/[epic-id]/
+  [epic-id].md        Project note, created by `init-epic` (dotpm shows it as a project)
+  epic.md             Product requirements and the story map: ordered stories with rough acceptance criteria
+  summary.md
+
+[stories-dir]/[story-id]/
+  [story-id].md       Project note, created by `init-story`; its `parent` links the epic
   spec.md             Requirements with FR/NFR ids, plus `## Design` from high-level-design
-  plan.md             Task index: ids, titles, order, dependencies, design refs
-  tasks/
-    [task-id].md      One work-state file per task
+  plan.md             Task index: ids, titles, order, dependencies, design refs. Never status.
+  summary.md
+  _tasks/
+    [task-id].md      One task note per task, created by `new-task`
 ```
 
 - **`story-id`** — kebab-case, chosen once and never renamed. Use the tracker key when one exists (`pac2-8120`), otherwise a short slug (`shipment-tracking`).
-- **`task-id`** — `t01`, `t02`, … in plan order, plus a slug: `t02-apply-event`. Ids are never reused or renumbered after the plan is approved; a task added later takes the next free number.
-- **Epics** are optional. A story belongs to an epic when its `plan.md` frontmatter says `epic: [epic-id]`.
+- **`task-id`** — the file name of the task note: the slug of its title. Titles start with the plan number (`T02 Apply event`), so ids read `t01`, `t02`, … in plan order plus a slug: `t02-apply-event`. `new-task` derives the id from the title. Ids are never reused or renumbered after the plan is approved; a task added later takes the next free number.
+- **Project notes** (`[story-id].md`, `[epic-id].md`) hold no content. The Obsidian plugin rewrites their body whenever it saves them, so requirements, designs and plans stay in `epic.md`, `spec.md` and `plan.md`.
+- **Epics** are optional. A story belongs to an epic when its project note's `parent` links it, set by `init-story [story-id] "[title]" [epic-id]`.
 - A project-level spec (the whole product, or a capability map with module specs) stays at `SPEC.md` in the project root. Stories reference it; they don't copy it.
-- If the project designates another spec location or an external spec tool, that location replaces `docs/stories/`; the one-file-per-task rule still applies.
+- If the project designates another spec location or an external spec tool, that location replaces `[stories-dir]`; the one-note-per-task rule still applies.
 
 ## Who Writes What
 
@@ -85,40 +105,69 @@ docs/stories/[story-id]/
 |---|---|---|---|
 | `spec.md` | `spec-driven-development`, `high-level-design` | Before approval, or when a design change is escalated | Read-only while tasks are being built |
 | `plan.md` | `planning-and-task-breakdown` | Before approval, or on a re-plan | Read-only while tasks are being built. Task status is **never** recorded here. |
-| `tasks/[task-id].md` | The session that claimed the task | While building | Exactly one writer: the claim owner |
+| `[story-id].md`, `[epic-id].md` | `work-state.sh` (`init-story`, `init-epic`, `new-task`, `set`) | Planning, then status changes | Scripted only. Never edited by hand. |
+| `_tasks/[task-id].md` | The session that claimed the task | While building | Exactly one writer: the claim owner |
 
-No hand-maintained checklist exists. Progress is read from the task files' `status` fields.
+No hand-maintained checklist exists. Progress is read from the task notes' `status` fields.
 
-## Task File Template
+Within a task note, two kinds of writes never mix:
+
+- **Frontmatter** (status, progress, dependencies, `design_refs`, `branch`, `design_approved`) changes only through `work-state.sh`: `new-task`, `field`, `set`, `claim`, `approve`. Never edit it by hand, because these commands keep progress, timestamps, and the project note's task list consistent.
+- **Body sections** (the task description above `## Design`, `## Design`, `## Summary`, and the `## Checklist` ticks) are written with ordinary file-edit tools, at the path `work-state.sh path [story-id] [task-id]` prints. `## Log` lines are added with `work-state.sh log`.
+
+## Task Note
+
+The task note is created only by `work-state.sh new-task [story-id] "[title]" [dep-id…]`, which prints `task=[task-id]` and `path=<absolute path>`. It fails when the story's project note doesn't exist (run `init-story` first) or the id is taken.
 
 ```markdown
 ---
-id: t02-apply-event
-story: shipment-tracking
-status: pending          # pending | claimed | done | blocked
-depends_on: [t01-webhook-route]
-design_refs: [C3, C4, C5]
-owner:                   # set on claim: branch or session name
+pm-task: true
+projectId: "[[shipment-tracking|Shipment tracking]]"
+parentId:
+id: <generated>
+title: "T02 Apply event"
+type: task
+status: todo             # todo | in-progress | blocked | review | done | cancelled
+priority: medium
+start: ""
+due: ""
+progress: 0              # 100 when done, else % of ## Checklist ticked
+assignees: []
+tags:
+  - story/shipment-tracking
+subtaskIds: []
+dependencies:
+  - "[[t01-webhook-route|T01 Webhook route]]"
+createdAt: 2026-10-04T10:00:00.000Z
+updatedAt: 2026-10-04T10:00:00.000Z
+customFields:
+  design_refs: C3, C4
+  branch: feat-x         # set by claim: the claimer's work branch
+  design_approved: 2026-10-04T10:00Z 1a2b3c4d5e6f
 ---
 
-## Task t02: Worker applies a stored event to the shipment status
-<!-- body: the Step 4 task structure from planning-and-task-breakdown
-     (description, acceptance criteria, verification, files, scope) -->
+<task description: the Step 4 structure from planning-and-task-breakdown
+ (description, acceptance criteria, verification, files, scope), above ## Design>
 
 ## Design
-<!-- low-level-design note, added just before implementation -->
 
 ## Summary
-<!-- catch-up summary from the task's approval gate (approval-gate.md) -->
 
-## Subtasks
-<!-- optional checklist the owner ticks while building, e.g. - [ ] adapter  - [x] schema -->
+## Checklist
 
 ## Log
-<!-- one line per session: date, what changed, what's next -->
+
+Project: [[shipment-tracking|Shipment tracking]]
 ```
 
-`planning-and-task-breakdown` creates every task file with `status: pending` when the plan is written, using its Step 4 task structure as the body. `low-level-design` fills the `## Design` section. The builder updates `status`, `owner`, `## Subtasks`, and `## Log`, and writes a log line before stopping for any reason, so the next session can pick up from it.
+- **Status:** `todo | in-progress | blocked | review | done | cancelled`. A task is **complete** when it is `done` or `cancelled`. `review` means finished and waiting for review; it is not complete. `completed: YYYY-MM-DD` appears only on complete tasks.
+- **`dependencies`** lists the task ids this task waits for; `next` starts a task only when all of them are complete.
+- **`customFields`** holds the agent-only data: `design_refs` (shared contract ids from the design, e.g. `C3, C4`), `branch` (the claim's work branch), and `design_approved` (written by `approve`; the fingerprint covers `## Design` only).
+- **`title`** is the single source of the file name, so never edit it by hand.
+- **`## Checklist`** is an optional list the owner ticks while building (`- [ ] adapter`, `- [x] schema`); `progress` follows the ticked share. **`## Log`** holds one line per session: `- YYYY-MM-DD what changed, what's next`. Add lines with `work-state.sh log`.
+- The trailing `Project: [[…]]` line belongs to the Obsidian plugin; keep it.
+
+`planning-and-task-breakdown` creates every task note with `new-task` when the plan is written, and inserts the Step 4 structure as the body above `## Design`. `low-level-design` fills `## Design`. The builder moves state with `claim`, `log`, and `set`, ticks `## Checklist`, and writes a log line before stopping for any reason, so the next session can pick up from it.
 
 ## Claim Protocol
 
@@ -126,23 +175,26 @@ A claim is a **lock ref**, `claim/[story-id]/[task-id]`, pointing at a unique em
 
 | Step | Command | What it does |
 |---|---|---|
-| Pick | `work-state.sh next [story-id]` | Fetches with `--prune`, then prints the first `pending` task with no claim whose `depends_on` tasks are `done` **in this checkout** (merged here, not just finished on another branch). Exit 4 means nothing is claimable. |
-| Claim | `work-state.sh claim [story-id] [task-id] [work-branch]` | Creates the lock with `git update-ref <ref> <commit> ""`, which fails if it already exists. With a remote, it pushes with an empty `--force-with-lease`, so the push fails if another machine holds the lock, even one this machine couldn't see. Exit 3 means another session won; pick again. The work branch defaults to the current branch. |
-| Release | `work-state.sh release [story-id] [task-id]` | Deletes the lock locally and on the remote |
+| Pick | `work-state.sh next [story-id]` | Fetches with `--prune`, then prints the first `todo` task with no claim whose dependencies are complete. In the repo store, "complete" is checked **in this checkout** (merged here, not just finished on another branch). In the vault store, a dependency counts once it is complete and its claim is gone: a released lock means merged. Exit 4 means nothing is claimable. |
+| Claim | `work-state.sh claim [story-id] [task-id] [work-branch]` | Creates the lock with `git update-ref <ref> <commit> ""`, which fails if it already exists. With a remote, it pushes with an empty `--force-with-lease`, so the push fails if another machine holds the lock, even one this machine couldn't see. Exit 3 means another session won; pick again. Exit 5 means the lock couldn't be published. Once the lock is held, it sets `status: in-progress` and `branch` to the work branch, which defaults to the current branch. In the repo store, when the work branch has no checkout yet, it leaves the note alone (the edit would sit in this checkout, in the way of the merge) and prints the `work-state.sh set [story-id] [task-id] in-progress` command to run from the new worktree; that also records the branch. |
+| Release | `work-state.sh release [story-id] [task-id]` | Deletes the lock locally and on the remote. The status is unchanged. |
 
-Before picking, bring the base branch up to date (`git pull --ff-only`) so tasks finished and merged elsewhere show as `done`.
+Before picking, bring the base branch up to date (`git pull --ff-only`) so tasks finished and merged elsewhere show as complete.
 
 **Working the task:**
 
 - *Worktree per task:* `git worktree add -b [work-branch] ../[repo]-[task-id]`, claim with that work branch, and build there.
-- *Same checkout:* claim with the current branch and build in place. Other sessions share this checkout's git index, so commit only your own paths: `git commit -- <task file> <code paths>`.
-- Set `status: claimed` and `owner: [work-branch]` in the task file. Tick `## Subtasks` and write a `## Log` line as you go, and always before stopping.
+- *Same checkout:* claim with the current branch and build in place. Other sessions share this checkout's git index, so commit only your own paths: `git commit -- <code paths>`, plus the task note in the repo store (`git commit -- <task note> <code paths>`). Get the note's path from `work-state.sh path [story-id] [task-id]`.
+- `claim` has already set `in-progress` and the branch, unless it printed a `set … in-progress` command for a worktree that didn't exist yet: run that from the worktree. Don't set them again. Tick `## Checklist` and add `work-state.sh log` lines as you go, and always before stopping.
+- Where the store is the repo, a claimed task's note is read and written in the work branch's worktree first (it's the freshest copy). The vault store has a single copy, shared by every worktree.
 
-**Finishing:** set `status: done` and commit it with the task's code. Release the lock once `done` is on the base branch, which is where `next` looks:
+**Finishing:** run `work-state.sh set [story-id] [task-id] done`, then commit the task's code (repo store: with the task note; vault store: the note isn't in git, so there's nothing more to commit for it). Release the lock once the work is on the base branch, which is where `next` looks:
 - *Committed on the base branch* (same checkout, no separate branch): release right after the commit.
 - *Committed on a work branch* (a worktree, or a branch in the same checkout): release after that branch is merged into the base branch. A lock released earlier lets another session take the task again. Until then, `status` shows the task as done but "not yet merged", and `next` doesn't treat it as a finished dependency.
 
-**Blocked:** set `status: blocked` with the reason in `## Log` and keep the lock. The task shows as `[!]` until someone unblocks it or explicitly releases it. Releasing a blocked task never deletes its work branch.
+The vault store has no git history for task notes, so `done` is visible there the moment it's set, from every branch. That is why `next` there also requires the lock to be released before it counts a dependency as finished.
+
+**Blocked:** run `work-state.sh set [story-id] [task-id] blocked` and `work-state.sh log [story-id] [task-id] "[reason]"`, and keep the lock. The task shows as `[!]` until someone unblocks it or explicitly releases it. Releasing a blocked task never deletes its work branch.
 
 **Continuing after a crash:** a claim whose work branch is the current branch belongs to this checkout, so continue it. Otherwise use `/resume`, and adopt a claimed task only when the user confirms that its previous session is gone. Never claim a task again.
 
@@ -155,7 +207,7 @@ c=$(git commit-tree "$(git rev-parse 'HEAD^{tree}')" -p HEAD -m "claim [story-id
 git update-ref refs/heads/claim/[story-id]/[task-id] "$c" ""      # fails → taken
 git push --force-with-lease=refs/heads/claim/[story-id]/[task-id]: origin refs/heads/claim/[story-id]/[task-id]   # fails → taken; delete the local ref
 ```
-If the project isn't a git repository, fall back to `status` and `owner` in the task file. Re-read the file immediately before claiming and skip any task that isn't `pending`. This fallback is not race-free, so parallel sessions need git.
+If the project isn't a git repository, there is no lock: re-read the task note immediately before claiming, skip any task whose `status` isn't `todo`, then run `work-state.sh set [story-id] [task-id] in-progress` and `work-state.sh field [story-id] [task-id] branch [session-name]`. This fallback is not race-free, so parallel sessions need git.
 
 ## Viewing Progress
 
@@ -163,7 +215,7 @@ If the project isn't a git repository, fall back to `status` and `owner` in the 
 bash [plugin-root]/hooks/work-state.sh status [story-id]
 ```
 
-prints the ticked tree, grouped as epics → stories → tasks → subtasks:
+prints the ticked tree, grouped as epics → stories → tasks:
 
 ```
 [~] epic payments  1/2 stories
@@ -171,30 +223,41 @@ prints the ticked tree, grouped as epics → stories → tasks → subtasks:
     [x] t01-refund
   [~] story payouts  1/3 tasks
     [x] t01-model
-    [~] t02-transfer claimed: claim/payouts/t02-transfer · work feat-transfer · subtasks 2/3 · worktree ../app-t02 · last log: wrote adapter, next: retries
+    [~] t02-transfer claimed: claim/payouts/t02-transfer · work feat-transfer · checklist 2/3 · worktree ../app-t02 · last log: wrote adapter, next: retries
     [ ] t03-retry
 ```
 
-`[x]` done · `[~]` claimed or partly done · `[ ]` not started · `[!]` blocked. The view is generated on demand and never committed. The truth stays in the task files and claim locks, so a tree nobody edits can't conflict. For a claimed task, the script reads the task file from the freshest place: the work branch's worktree (uncommitted edits included), then the work branch, then the current checkout.
+`[x]` done or cancelled · `[~]` in progress, in review, or claimed · `[ ]` todo · `[!]` blocked. The view is generated on demand and never committed. The truth stays in the task notes and claim locks, so a tree nobody edits can't conflict. For a claimed task in the repo store, the script reads the task note from the freshest place: the work branch's worktree (uncommitted edits included), then the work branch, then the current checkout. The vault store has one copy.
 
 ## Resuming After a Session Ends
 
-A closed or crashed session loses its conversation, not its state. Everything needed to resume is in the task files, claim locks, work branches, and worktrees. `/resume [story-id]` recovers it:
+A closed or crashed session loses its conversation, not its state. Everything needed to resume is in the task notes, claim locks, work branches, and worktrees. `/resume [story-id]` recovers it:
 
-1. Resolve the artifact root.
+1. Resolve the store.
 2. Hand the investigation to a fresh-context, **read-only** subagent (or, on hosts without subagents, do it yourself without editing anything). It:
    - runs `work-state.sh status` for the story (or all stories)
-   - for each claimed or blocked task: reads its task file from where `status` found it (acceptance, `## Design`, `## Subtasks`, `## Log`), and in its worktree or work branch checks `git status` and `git log -1` for uncommitted work and the last commit, comparing ticked boxes against the code actually present
-   - checks which acceptance criteria and subtasks are ticked, and whether the last log line names a next step
+   - for each in-progress or blocked task: reads its task note (acceptance, `## Design`, `## Checklist`, `## Log`) at the path `work-state.sh path` prints, or in the worktree `status` shows (repo store only: otherwise `git show <work-branch>:<path>`). In its worktree or work branch it checks `git status` and `git log -1` for uncommitted work and the last commit, comparing ticked boxes against the code actually present
+   - checks which acceptance criteria and checklist items are ticked, and whether the last log line names a next step
    - returns the ticked tree, where each in-progress task stopped, and the recommended next action
 3. Show the result to the user and confirm the next action before continuing. Continuing a claimed task means working on its recorded work branch or worktree, not claiming again.
 
 A new session in Claude Code also gets a one-line hint at startup when claims exist, naming the ones whose work branch is the current checkout (`work-state.sh hint`, local refs only so startup stays fast and offline). It suggests `/resume`; it never runs it.
 
+## Obsidian (dotpm) Compatibility
+
+The notes follow the format of the Obsidian project-manager plugin ("dotpm"), so a vault shows stories as projects and tasks as tasks. A few of its behaviors shape the rules above:
+
+- **Regenerated bodies.** On save, dotpm rewrites a project note's body (heading, description, `## Tasks`) and deletes everything in a task note from a `## Subtasks` heading to the end, regenerating it from child notes. So project notes carry no content, and task notes use `## Checklist`, never `## Subtasks`.
+- **Title ↔ file name.** dotpm names a task note from its title: lowercase, `\ / : * ? " < > |` and whitespace become `-`, at most 60 characters. `T02 Apply event` is `t02-apply-event`, and `new-task` derives the task id this way. Renaming a title by hand makes dotpm rename the file and breaks the id.
+- **Statuses.** `todo`, `in-progress`, `blocked`, `review`, `done`, `cancelled`; complete means `done` or `cancelled`.
+- **No git history in a vault.** A vault store's task notes aren't in the repository, so there is no merged-branch signal for them. `next` relies on released locks instead: a dependency counts only when it is complete and its claim is gone.
+- **Custom fields.** `design_refs`, `branch`, and `design_approved` live in `customFields`; the story's project note declares them so dotpm displays them.
+- **Links.** In the vault store every wikilink (`projectId`, `dependencies`, `parent`, `taskIds`, `## Tasks`, the footer) uses the note's vault path, such as `[[Projects/app/stories/shipment-tracking/_tasks/t01-webhook-route|T01 webhook route]]`, because ids like `t01-*` repeat across stories and repositories in one vault. The repo store uses bare names, as in the template above. `work-state.sh` writes every link; the task id is always the last path segment.
+
 ## External Trackers
 
-When the project designates an issue tracker, each task is a tracker item instead of a task file, and the claim is the tracker's assignment. Assigning the item to yourself replaces steps 2–3 and 5. `plan.md` keeps the ordered list of item ids or links.
+When the project designates an issue tracker, each task is a tracker item instead of a task note, and the claim is the tracker's assignment. Assigning the item to yourself replaces the claim steps, and the tracker's own status replaces `set` and `log`. `plan.md` keeps the ordered list of item ids or links.
 
 ## Legacy Layout
 
-A repository that already has `tasks/plan.md` and `tasks/todo.md` from an earlier plan keeps working: finish or discard that plan in the old single-file layout, since it is not safe for parallel sessions. New plans use `docs/stories/`.
+A repository that already has `tasks/plan.md` and `tasks/todo.md` from an earlier plan keeps working: finish or discard that plan in the old single-file layout, since it is not safe for parallel sessions. New plans use `[stories-dir]` (`docs/stories/` in the repo store by default). A repository whose stories use `[stories-dir]/[story-id]/tasks/*.md` is converted with `work-state.sh migrate [story-id]`.

@@ -9,7 +9,7 @@ description: Produces a short low-level design note for one implementation task 
 
 Code generation is fast; deciding intent is not. Without a written low-level design, the implementation makes the hard calls silently — what happens on a duplicate, which check runs first, what a partial failure leaves behind — and makes them differently each time. This skill makes those calls explicit, in writing, before the first test, in a note short enough to read in a minute.
 
-The note is 5 to 15 lines and lives in the `## Design` section of the task's own file, `docs/stories/[story-id]/tasks/[task-id].md` (or in the task's tracker item, when the plan uses an external tracker). Only the session that claimed the task writes that file, so parallel sessions never collide (see `../../references/work-artifacts.md`); the plan itself is never edited. It designs the **inside** of one task. The shared contracts it builds on — the APIs, schemas, status lifecycles, and failure policy that more than one task depends on — were fixed by the `high-level-design` skill and carry ids like `C3`; this skill cites them and never changes them. Anything that belongs to this task alone — a new endpoint or table no other task reads or writes — is designed here.
+The note is 5 to 15 lines and lives in the `## Design` section of the task's own note, `[stories-dir]/[story-id]/_tasks/[task-id].md` (the path `work-state.sh path [story-id] [task-id]` prints; or in the task's tracker item, when the plan uses an external tracker). Only the session that claimed the task writes that note, so parallel sessions never collide (see `../../references/work-artifacts.md`); the plan itself is never edited. It designs the **inside** of one task. The shared contracts it builds on — the APIs, schemas, status lifecycles, and failure policy that more than one task depends on — were fixed by the `high-level-design` skill and carry ids like `C3`; this skill cites them and never changes them. Anything that belongs to this task alone — a new endpoint or table no other task reads or writes — is designed here.
 
 ## When to Use
 
@@ -29,7 +29,7 @@ The note is 5 to 15 lines and lives in the `## Design` section of the task's own
 
 ### Step 1: Load only what the task needs
 
-Read the task file, the design sections its `design_refs` cite (shared contract ids like `C3`), and the code it will touch. Follow `context-engineering`: load the relevant slices, not the whole spec. Note the patterns the existing code already uses — error style, data-access layer, transaction handling — and match them. A note that invents a second way to do what the codebase already does has failed.
+Read the task note (`work-state.sh brief [story-id] [task-id]` packs it with the plan row and the cited sections), the design sections its `design_refs` cite (shared contract ids like `C3`), and the code it will touch. Follow `context-engineering`: load the relevant slices, not the whole spec. Note the patterns the existing code already uses — error style, data-access layer, transaction handling — and match them. A note that invents a second way to do what the codebase already does has failed.
 
 ### Step 2: Contracts at this task's edges
 
@@ -82,11 +82,11 @@ An edge case with no test is an undecided edge case.
 - **Over 15 lines?** The task is too big. Stop and ask for it to be split into new tasks; don't edit the plan from inside a task.
 - **Touches anything shared?** Stop if the task changes something cited by a `C` id, adds a component, creates an endpoint, status, or event another task will use, or alters a table, endpoint, or message that any other task also reads or writes. Adding a column to a shared table counts, even if only this task will use the column. Other tasks and their tests depend on that shape. Raise it against the `## Design` section (`high-level-design`) and get it approved before continuing. Never patch a shared contract from inside a task.
 - **Adds an endpoint, table, or rule that belongs to this task alone?** That's in scope: design it in the note.
-- **Otherwise** make sure the whole note is in the task file's `## Design` section (in one-pass mode, write it now), then pass the approval gate (`../../references/approval-gate.md`). The summary goes in the task file's `## Summary`, and it always asks at least "Proceed with this design?". Show the note itself at the gate, not just the summary. For a bug, or when more than one approach is plausible, the approach must have been asked as a decision brief (options, pros, cons, effort, reversibility, and the condition that would change your pick): at the step 1 checkpoint, or here in one-pass mode. Never re-ask what a checkpoint settled. After the user's go-ahead, record it with `work-state.sh approve [story-id] [task-id]`. Editing the note afterwards voids the approval. Only then hand off to `test-driven-development` and `incremental-implementation`.
+- **Otherwise** make sure the whole note is in the task note's `## Design` section (in one-pass mode, write it now), then pass the approval gate (`../../references/approval-gate.md`). The summary goes in the task note's `## Summary`, and it always asks at least "Proceed with this design?". Show the note itself at the gate, not just the summary. For a bug, or when more than one approach is plausible, the approach must have been asked as a decision brief (options, pros, cons, effort, reversibility, and the condition that would change your pick): at the step 1 checkpoint, or here in one-pass mode. Never re-ask what a checkpoint settled. After the user's go-ahead, record it with `work-state.sh approve [story-id] [task-id]`. Editing the note afterwards voids the approval. Only then hand off to `test-driven-development` and `incremental-implementation`.
 
 ## Note Template
 
-Fill the `## Design` section of the task file (the task's `design_refs` in its frontmatter, here `[C2, C4]`, say which contracts it cites):
+Fill the `## Design` section of the task note (the task's `design_refs` custom field, here `C2, C4`, says which contracts it cites; `work-state.sh field [story-id] [task-id] design_refs "C2, C4"` sets it):
 
 ```markdown
 ## Design
@@ -129,7 +129,7 @@ The note is the review baseline. `code-review-and-quality` checks the diff again
 
 ## Verification
 
-- [ ] The note sits in the task file's `## Design` section and is 15 lines or fewer; the plan is unchanged
+- [ ] The note sits in the task note's `## Design` section and is 15 lines or fewer; the plan is unchanged
 - [ ] Edge signatures and types are written with one concrete example
 - [ ] Every invariant has a decided outcome on violation
 - [ ] Every flow step that can fail has a failure branch

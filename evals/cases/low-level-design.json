@@ -35,12 +35,12 @@
       "id": 1,
       "kind": "execution",
       "prompt": "Task t02-apply-event in story shipment-tracking is next. Write its low-level design note before implementing it, in one pass; I'll review the whole note at the end.",
-      "expected_output": "A short design note in the ## Design section of the t02 task file: edge contracts, invariants, flow with failure branches, failure policy, security line, observability line, and the test cases they imply",
+      "expected_output": "A short design note in the ## Design section of the t02 task note: edge contracts, invariants, flow with failure branches, failure policy, security line, observability line, and the test cases they imply",
       "files": [
         "low-level-design"
       ],
       "expectations": [
-        "The note is written into the ## Design section of docs/stories/shipment-tracking/tasks/t02-apply-event.md and stays short (roughly 5 to 15 lines of design, not a long spec); plan.md is not modified",
+        "The note is written into the ## Design section of docs/stories/shipment-tracking/_tasks/t02-apply-event.md and stays short (roughly 5 to 15 lines of design, not a long spec); plan.md is not modified and the task note's frontmatter is not hand-edited",
         "The note states the task's function signature or types at its edges with one concrete example",
         "Out-of-order events and invalid transitions are handled by citing the C3 and C4 contracts rather than re-deriving or contradicting them",
         "The note deals explicitly with the same event reaching the worker twice (C6 at-least-once delivery), either with data that already exists or by escalating the shared-contract change it needs, instead of leaving duplicate history rows to chance",
@@ -61,7 +61,7 @@
       "expectations": [
         "The response is headed as step 1 of the low-level design (for example 'Step 1/6') and shows what that step found: the shared contract ids the task cites (such as C3, C4, C6) and the code or files it will touch",
         "It stops after step 1 and asks the user a question before continuing (a decision brief or 'Continue to step 2?'), with a recommended answer",
-        "It does not write the later parts of the design yet: no failure-branch flow, cross-cutting lines, or test list appear in the response or in the task file's ## Design section",
+        "It does not write the later parts of the design yet: no failure-branch flow, cross-cutting lines, or test list appear in the response or in the task note's ## Design section",
         "No implementation code is written and plan.md is not modified"
       ]
     }

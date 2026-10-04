@@ -31,7 +31,7 @@ Before writing any code, operate in read-only mode:
 - Map dependencies between components
 - Note risks and unknowns
 
-**Do NOT write code during planning.** The output is a plan document and one file per task, recorded in the task list target (see Output Files; default `docs/stories/[story-id]/plan.md` plus a `tasks/` file per task), not implementation.
+**Do NOT write code during planning.** The output is a plan document and one task note per task, recorded in the task list target (see Output Files; default `[stories-dir]/[story-id]/plan.md` plus a task note per task under `_tasks/`, with `[stories-dir]` from `work-state.sh root`), not implementation.
 
 ### Step 2: Identify the Dependency Graph
 
@@ -79,7 +79,7 @@ Each vertical slice delivers working, testable functionality.
 
 ### Step 4: Write Tasks
 
-Each task follows this structure, whether it lands in its own task file or as an item in an external tracker (see Output Files):
+Each task follows this structure, whether it lands in its own task note or as an item in an external tracker (see Output Files):
 
 ```markdown
 ## Task [task-id]: [Short descriptive title]
@@ -95,7 +95,7 @@ Each task follows this structure, whether it lands in its own task file or as an
 - [ ] Build succeeds: [the repository's build command]
 - [ ] Manual check: [description of what to verify]
 
-**Dependencies and design refs:** recorded in the task file's frontmatter as `depends_on` (task ids, or `[]`) and `design_refs` (shared contract ids from the design, e.g. `[C1, C3]`), so `/build` can read them.
+**Dependencies and design refs:** recorded in the task note's frontmatter, never typed by hand: dependencies are passed to `work-state.sh new-task` (task ids, or none), and `work-state.sh field [story-id] [task-id] design_refs "C1, C3"` stores the shared contract ids from the design, so `/build` can read them.
 
 **Files likely touched:**
 - `src/path/to/file.ts`
@@ -104,7 +104,7 @@ Each task follows this structure, whether it lands in its own task file or as an
 **Estimated scope:** [Small: 1-2 files | Medium: 3-5 files | Large: 5+ files]
 ```
 
-Don't write the task's internal design here. Just before a task is implemented, its low-level design note is added to the task file with the `low-level-design` skill.
+Don't write the task's internal design here. Just before a task is implemented, its low-level design note is added to the task note with the `low-level-design` skill.
 
 ### Step 5: Order and Checkpoint
 
@@ -149,18 +149,18 @@ If a task is L or larger, it should be broken into smaller tasks. An agent perfo
 
 ## Output Files
 
-Plans follow the per-story layout in `../../references/work-artifacts.md`, which is built so several sessions can work one plan at once. Resolve the artifact root first as that reference describes; `docs/stories` below is the default:
+Plans follow the per-story layout in `../../references/work-artifacts.md`, which is built so several sessions can work one plan at once. Resolve the store first with `work-state.sh root`, as that reference describes. `[stories-dir]` below is the printed `stories_dir` (in the repo store, `docs/stories` by default; in an Obsidian vault, a folder inside it):
 
-- **Plan document:** Save the plan to `docs/stories/[story-id]/plan.md`. It holds the overview, decisions, risks, and an ordered task index. It never records task status, so it stays read-only while tasks are built.
+- **Plan document:** Save the plan to `[stories-dir]/[story-id]/plan.md`. It holds the overview, decisions, risks, and an ordered task index. It never records task status, so it stays read-only while tasks are built.
 - **Task list:** Record each task in the **task list target** (defined below).
 
 Each story gets its own directory, so planning a new story never touches another story's plan.
 
-**Never overwrite an incomplete plan.** Before writing into an existing `docs/stories/[story-id]/` directory, check whether any of its task files are not yet `done`:
+**Never overwrite an incomplete plan.** Before writing into an existing `[stories-dir]/[story-id]/` directory, run `work-state.sh status [story-id]` and check whether any of its tasks are not yet complete (`done` or `cancelled`):
 
-- Same work being replanned (the user asked to revise or extend this plan) → update the plan in place. Keep existing task ids; add new tasks with the next free id; never edit a task file another session has claimed.
-- Different work → **stop and ask.** Choose a different story id rather than reusing one. Do not delete, overwrite, or rename existing task files on your own.
-- A legacy `tasks/plan.md` or `tasks/todo.md` from an earlier plan is left untouched; new plans go in `docs/stories/`.
+- Same work being replanned (the user asked to revise or extend this plan) → update the plan in place. Keep existing task ids; add new tasks with the next free id; never edit a task note another session has claimed.
+- Different work → **stop and ask.** Choose a different story id rather than reusing one. Do not delete, overwrite, or rename existing task notes on your own.
+- A legacy `tasks/plan.md` or `tasks/todo.md` from an earlier plan is left untouched; new plans go in `[stories-dir]`.
 
 The same rule applies to an external task list target: never bulk-close or delete another plan's open tracker items to make room for new ones.
 
@@ -168,20 +168,16 @@ The same rule applies to an external task list target: never bulk-close or delet
 
 The task list target is where tasks and checkpoints are recorded. It is defined once, here; every other reference in this skill defers to it.
 
-- **Default: one file per task** at `docs/stories/[story-id]/tasks/[task-id].md`, created with `status: pending`: the frontmatter below, then the Step 4 structure, then empty `## Design`, `## Summary`, `## Subtasks`, and `## Log` sections. One file per task means parallel sessions never write the same file. This is the convention the `/build` command expects; `../../references/work-artifacts.md` has the full lifecycle and claim protocol.
-  ```
-  ---
-  id: t02-apply-event
-  story: shipment-tracking
-  status: pending        # pending | claimed | done | blocked
-  depends_on: [t01-webhook-route]
-  design_refs: [C3, C4]
-  owner:
-  ---
-  ```
-- **External tracker:** if the project's agent rules (`CLAUDE.md`, `AGENTS.md`, etc.) or the user designate an issue tracker (e.g. GitHub Issues, Jira, Linear, `bd`/beads), create one tracker item per task instead of writing task files. Map the Step 4 structure onto the tracker's fields: acceptance criteria and verification steps in the item body, dependencies via the tracker's linking mechanism (`bd dep add`, "blocked by", etc.). Record Step 5 checkpoints as tracker items too, or as a checklist in the plan document if the tracker has no natural equivalent.
+- **Default: one note per task** at `[stories-dir]/[story-id]/_tasks/[task-id].md`, in the format described in `../../references/work-artifacts.md`. One note per task means parallel sessions never write the same file. This is the convention the `/build` command expects; the reference has the full lifecycle and claim protocol. Create the notes with `work-state.sh`, never by hand-writing frontmatter:
+  1. `bash [plugin-root]/hooks/work-state.sh init-story [story-id] "[Story title]" [epic-id]` creates the story's project note if it is missing (pass the epic id only when the story belongs to an epic).
+  2. For each task, in plan order: `work-state.sh new-task [story-id] "T02 Apply event" [dep-id…]`. The title starts with the plan number; the task id comes from it (`t02-apply-event`). Dependencies are task ids that already exist, so create tasks in dependency order. The command prints `task=[task-id]` and `path=…`.
+  3. Insert the Step 4 structure (description, acceptance criteria, verification, files, scope) into the note at that path, **above** `## Design`. Leave `## Design`, `## Summary`, `## Checklist`, and `## Log` empty.
+  4. `work-state.sh field [story-id] [task-id] design_refs "C3, C4"` records the contracts the task cites.
 
-When using an external tracker, note it in `docs/stories/[story-id]/plan.md` (e.g. "Tasks tracked in Linear project FOO") so downstream steps and future sessions know where to look, and keep the plan document's Task List section as an ordered index of tracker item IDs or links rather than a duplicate checklist.
+  Every task starts as `todo`. Record checkpoints (Step 5) the same way.
+- **External tracker:** if the project's agent rules (`CLAUDE.md`, `AGENTS.md`, etc.) or the user designate an issue tracker (e.g. GitHub Issues, Jira, Linear, `bd`/beads), create one tracker item per task instead of writing task notes. Map the Step 4 structure onto the tracker's fields: acceptance criteria and verification steps in the item body, dependencies via the tracker's linking mechanism (`bd dep add`, "blocked by", etc.). Record Step 5 checkpoints as tracker items too, or as a checklist in the plan document if the tracker has no natural equivalent.
+
+When using an external tracker, note it in `[stories-dir]/[story-id]/plan.md` (e.g. "Tasks tracked in Linear project FOO") so downstream steps and future sessions know where to look, and keep the plan document's Task List section as an ordered index of tracker item IDs or links rather than a duplicate checklist.
 
 ## Plan Document Template
 
@@ -196,7 +192,7 @@ When using an external tracker, note it in `docs/stories/[story-id]/plan.md` (e.
 - [Key decision 2 and rationale]
 
 ## Task Index
-Status lives in each task file, never here.
+Status lives in each task note (`work-state.sh status`), never here. This table is a prose index of the plan.
 
 | Id | Task | Depends on | Design refs |
 |----|------|------------|-------------|
@@ -234,14 +230,14 @@ When multiple agents or sessions are available:
 | "Planning is overhead" | Planning is the task. Implementation without a plan is just typing. |
 | "I can hold it all in my head" | Context windows are finite. Written plans survive session boundaries and compaction. |
 | "That story's plan is stale, I'll just replace it" | Its unfinished tasks may be mid-build in another session. Overwriting them destroys work state that exists nowhere else. Stop and ask. |
-| "A single checklist is simpler than a file per task" | Until two sessions edit it at once. One file per task is what makes parallel work safe. |
+| "A single checklist is simpler than a note per task" | Until two sessions edit it at once. One note per task is what makes parallel work safe. |
 
 ## Red Flags
 
 - Starting implementation without a written task list
-- Overwriting a story's plan or task files that still have unfinished tasks for different work, without asking
-- Recording task status in `docs/stories/[story-id]/plan.md` instead of the task files
-- Writing task files when the project has designated an external tracker (or scattering tasks across both)
+- Overwriting a story's plan or task notes that still have unfinished tasks for different work, without asking
+- Recording task status in `[stories-dir]/[story-id]/plan.md` instead of the task notes
+- Writing task notes when the project has designated an external tracker (or scattering tasks across both)
 - Tasks that say "implement the feature" without acceptance criteria
 - No verification steps in the plan
 - All tasks are XL-sized
@@ -255,7 +251,7 @@ Before starting implementation, confirm:
 - [ ] Every task has acceptance criteria
 - [ ] Every task has a verification step
 - [ ] Task dependencies are identified and ordered correctly
-- [ ] Tasks are recorded in the task list target (default: one `pending` file per task under `docs/stories/[story-id]/tasks/`)
+- [ ] Tasks are recorded in the task list target (default: one `todo` note per task under `[stories-dir]/[story-id]/_tasks/`, created with `work-state.sh new-task`)
 - [ ] No pre-existing incomplete plan was overwritten without explicit user confirmation
 - [ ] No task touches more than ~5 files
 - [ ] Checkpoints exist between major phases

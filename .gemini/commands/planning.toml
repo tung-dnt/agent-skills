@@ -3,18 +3,18 @@ description = "Break work into small verifiable tasks with acceptance criteria a
 prompt = """
 Invoke the the planning-and-task-breakdown skill skill.
 
-Resolve the artifact root first. From the project, run `bash [agent-skills plugin root]/hooks/work-state.sh root`. If it reports `configured=false`, propose a location using its notes and write the config (`work-state.sh configure <storiesDir>`) only after the user confirms. Wherever this command says `docs/stories`, use the resolved `stories_dir`.
+Resolve the artifact root first. From the project, run `bash [agent-skills plugin root]/hooks/work-state.sh root`. If it reports `store=repo` and `configured=false`, propose a location using its notes and write the config (`work-state.sh configure <storiesDir>`) only after the user confirms; with `store=vault` there is nothing to propose. `[stories-dir]` below means the resolved `stories_dir` (an absolute path, possibly inside an Obsidian vault); its default in the repo store is `docs/stories`. Change task state only through `work-state.sh` commands, never by editing frontmatter by hand.
 
-Read the existing spec (docs/stories/[story-id]/spec.md, SPEC.md, or equivalent) and the relevant codebase sections. Then:
+Read the existing spec (`[stories-dir]/[story-id]/spec.md`, SPEC.md, or equivalent) and the relevant codebase sections. Then:
 
 1. Enter plan mode — read only, no code changes
 2. Identify the dependency graph between components
 3. Slice work vertically (one complete path per task, not horizontal layers)
 4. Write tasks with acceptance criteria and verification steps
 5. Add checkpoints between phases
-6. Pass the approval gate (`references/approval-gate.md` in the plugin): write and show the catch-up summary, run the grill-me skill rounds over the open decisions (always at least one question), and wait for the user's explicit go-ahead. Save the summary to `docs/stories/[story-id]/summary.md`
+6. Pass the approval gate (`references/approval-gate.md` in the plugin): write and show the catch-up summary, run the grill-me skill rounds over the open decisions (always at least one question), and wait for the user's explicit go-ahead. Save the summary to `[stories-dir]/[story-id]/summary.md`
 
-Save the plan to docs/stories/[story-id]/plan.md and write one file per task under docs/stories/[story-id]/tasks/, each starting with status: pending, as the skill describes. Task status lives only in the task files, never in the plan, so several sessions can build the plan at once. After approval, commit the plan and task files so every worktree and machine sees them before anyone claims a task.
+Save the plan to `[stories-dir]/[story-id]/plan.md`. If the story has no project note yet, create it with `work-state.sh init-story [story-id] "[title]"`. Then create one task note per task with `work-state.sh new-task [story-id] "T01 [title]" [dependency-task-id…]` and `work-state.sh field [story-id] [task-id] design_refs "C1, C2"`, as the skill describes, and write each task's description above `## Design` in its note (the path `work-state.sh path [story-id] [task-id]` prints). Never hand-write task frontmatter. Task status lives only in the task notes, never in the plan, so several sessions can build the plan at once. After approval, in the repo store, commit the plan and task notes so every worktree and machine sees them before anyone claims a task; the vault store isn't in git.
 
-If that story already has task files that aren't done and belong to different work, stop and ask before writing — never silently overwrite an incomplete plan. Leave any legacy tasks/plan.md or tasks/todo.md untouched.
+If that story already has task notes that aren't done and belong to different work, stop and ask before writing — never silently overwrite an incomplete plan. Leave any legacy tasks/plan.md or tasks/todo.md untouched.
 """

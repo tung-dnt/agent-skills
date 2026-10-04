@@ -16,8 +16,8 @@ The orchestrator gives you the path to `work-state.sh`, the resolved stories dir
 ## Process
 
 1. Run `bash <work-state.sh> status [story-id]` for the ticked tree.
-2. For every claimed (`[~]`) or blocked (`[!]`) task:
-   - Read its task file from the freshest copy. If the tree shows a worktree, read the file there (uncommitted edits included); otherwise run `git show <work-branch>:<stories-dir>/<story-id>/tasks/<task-id>.md`. Look at the acceptance criteria, `## Design`, `## Subtasks`, and `## Log`.
+2. For every in-progress (`[~]`) or blocked (`[!]`) task:
+   - Read its task note from the freshest copy. Run `bash <work-state.sh> path <story-id> <task-id>` for its path, or, if the tree shows a worktree, read the note there (uncommitted edits included). Only in the repo store (`store=repo` in `bash <work-state.sh> root`) can the work branch hold a newer copy: then run `git show <work-branch>:<path relative to the repo root>`. The vault store has a single copy. Look at the acceptance criteria, `## Design`, `## Checklist`, and `## Log`.
    - Check the worktree or work branch with `git -C <worktree> status --short` and `git -C <worktree> log -1 --oneline`.
    - Compare the ticked boxes with the code actually present. Flag any box that is ticked for work that isn't there.
 3. Choose one recommended next action: continue a named task, start the next unclaimed one, or release a merged lock.

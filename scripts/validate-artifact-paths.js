@@ -38,10 +38,14 @@ const ARTIFACT_ALLOWLIST = new Set([
   'tasks/plan.md',  // legacy single-plan layout (read by /build as a fallback)
   'tasks/todo.md',  // legacy single-plan task list
   // Per-story layout, safe for parallel sessions (references/work-artifacts.md).
-  // Task state lives in docs/stories/[story-id]/tasks/[task-id].md, which this
+  // Task state lives in [stories-dir]/[story-id]/_tasks/[task-id].md, which this
   // pattern does not match, so only the spec and plan paths are pinned here.
-  'docs/stories/[story-id]/spec.md', // story spec + ## Design
-  'docs/stories/[story-id]/plan.md', // story task index (produced by /plan, read by /build)
+  // `[stories-dir]` is the resolved store (`work-state.sh root`: a vault folder or
+  // docs/stories); the docs/stories form is its repo-store default.
+  '[stories-dir]/[story-id]/spec.md', // story spec + ## Design
+  '[stories-dir]/[story-id]/plan.md', // story task index (produced by /plan, read by /build)
+  'docs/stories/[story-id]/spec.md',
+  'docs/stories/[story-id]/plan.md',
 ]);
 
 // The files that make up the spec -> plan -> build pipeline. Absent files are

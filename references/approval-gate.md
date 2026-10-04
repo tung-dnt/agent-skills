@@ -1,6 +1,6 @@
 # Approval Gate
 
-The one checkpoint every planning, design, and build workflow passes before work starts. Skills and commands link here instead of restating it. **Nothing downstream begins until the user confirms.** No code, task files, or claims beyond what the gate itself needs.
+The one checkpoint every planning, design, and build workflow passes before work starts. Skills and commands link here instead of restating it. **Nothing downstream begins until the user confirms.** No code, task notes, or claims beyond what the gate itself needs.
 
 ## When a Gate Runs
 
@@ -36,8 +36,8 @@ A checkpoint holds the user's attention, so it needs the main thread. Subagents 
 ### 1. Catch-up summary
 
 Write the summary so the user can catch up in one screen without reading the artifacts. Show it in the conversation exactly as saved, with the same headings, **and** save it:
-- Story or epic gates: `docs/stories/[story-id]/summary.md` or `docs/epics/[epic-id]/summary.md`, overwritten at each gate.
-- Task gates: the task file's `## Summary` section. Only the claiming session writes it, so parallel sessions never collide.
+- Story or epic gates: `[stories-dir]/[story-id]/summary.md` or `[epics-dir]/[epic-id]/summary.md`, overwritten at each gate (directories from `work-state.sh root`).
+- Task gates: the task note's `## Summary` section, at the path `work-state.sh path [story-id] [task-id]` prints. Only the claiming session writes it, so parallel sessions never collide.
 
 Use this template, in plain language. No call stacks or code dumps; link `file:line` at most, and only where it earns its place. Fold the evidence into each line, so every decision appears together with its reason. Omit any section that doesn't apply.
 
@@ -93,7 +93,7 @@ Run the `grill-me` skill over the open decisions: rounds of numbered questions w
 
 Continue only on an explicit go-ahead. A hedged reply ("looks fine I guess") is not a go-ahead: ask what's holding them back. When an answer changes the artifact, update it and the summary, then run the gate again.
 
-**Record it.** At a task gate, record the go-ahead with `work-state.sh approve [story-id] [task-id]`. It stores `design_approved: <date> <fingerprint>` in the task's frontmatter. `work-state.sh approved [story-id] [task-id]` exits 0 only while that approval exists and the `## Design` section is unchanged. Editing the note after approval voids it, and the gate runs again.
+**Record it.** At a task gate, record the go-ahead with `work-state.sh approve [story-id] [task-id]`. It stores `design_approved: <date> <fingerprint>` in the task note's `customFields`. `work-state.sh approved [story-id] [task-id]` exits 0 only while that approval exists and the `## Design` section is unchanged. Editing the note after approval voids it, and the gate runs again.
 
 ## Rules That Can't Be Skipped
 

@@ -92,7 +92,7 @@ Skills are user-invocable by default, so once they're discovered the whole lifec
 | Workflow | Copilot invocation | Notes |
 |----------|--------------------|-------|
 | Define | `/spec-driven-development` | Writes a structured spec before code |
-| Plan | `/planning-and-task-breakdown` | Produces `docs/stories/[story-id]/plan.md` and one task file per task |
+| Plan | `/planning-and-task-breakdown` | Produces `[stories-dir]/[story-id]/plan.md` and one task note per task (created with `work-state.sh new-task`) |
 | Build | `/incremental-implementation` | Pair with `/test-driven-development`; one slice at a time |
 | Verify | `/test-driven-development` | Red-green-refactor, Prove-It for bugs |
 | Review | `/code-review-and-quality` | Five-axis review |
@@ -137,8 +137,8 @@ For the rest, run the same `mkdir`/`cat` block with the filename swapped (the fi
 
 | Alias file | `description` | Complete body — everything below the frontmatter |
 |------------|---------------|--------------------------------------------------|
-| `.github/prompts/plan.prompt.md` | Break an approved spec into ordered, verifiable tasks | Use the planning-and-task-breakdown skill. Read the spec, then break the work into small, independently verifiable tasks, each with acceptance criteria and explicit dependency order. Save the plan to `docs/stories/[story-id]/plan.md` and one file per task under its `tasks/` folder. Write no product code — show me the plan and wait for my approval. |
-| `.github/prompts/build.prompt.md` | Implement the next planned task, test-first | Use the incremental-implementation and test-driven-development skills. Read `docs/stories/[story-id]/plan.md` and its task files, then take the next unclaimed pending task and only that one. Write a failing test first, make it pass, refactor, run the suite, and tick the task off. Stop there and report what changed. |
+| `.github/prompts/plan.prompt.md` | Break an approved spec into ordered, verifiable tasks | Use the planning-and-task-breakdown skill. Read the spec, then break the work into small, independently verifiable tasks, each with acceptance criteria and explicit dependency order. Save the plan to `[stories-dir]/[story-id]/plan.md` and create one task note per task with `work-state.sh new-task` (the stories directory is what `work-state.sh root` prints as `stories_dir`; `docs/stories` by default in the repo). Write no product code — show me the plan and wait for my approval. |
+| `.github/prompts/build.prompt.md` | Implement the next planned task, test-first | Use the incremental-implementation and test-driven-development skills. Read `[stories-dir]/[story-id]/plan.md` and its task notes, then take the next unclaimed `todo` task and only that one (`work-state.sh next`, then `claim`). Write a failing test first, make it pass, refactor, run the suite, and mark the task `done` with `work-state.sh set`. Stop there and report what changed. |
 | `.github/prompts/test.prompt.md` | Write tests before the code that satisfies them | Use the test-driven-development skill. For new behavior, write a failing test that captures it before any implementation. For a bug, reproduce it with a failing test first, then fix it. Run the suite after each step and show me the red and the green output. |
 
 Write the body yourself, or take it from this table, rather than copying `.claude/commands/*.md` verbatim: those files reference skills as `agent-skills:<name>`, a Claude Code plugin namespace that means nothing to Copilot.

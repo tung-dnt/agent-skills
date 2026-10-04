@@ -111,7 +111,7 @@ Run the design through `doubt-driven-development` with the spec as the contract,
 
 ## Output
 
-Write the design into the story spec, `docs/stories/[story-id]/spec.md`, as a `## Design` section (or a sibling `design.md` if the spec is already long), so it lives in the repository next to the code:
+Write the design into the story spec, `[stories-dir]/[story-id]/spec.md` (`docs/stories/[story-id]/spec.md` in the repo store; directory from `work-state.sh root`), as a `## Design` section (or a sibling `design.md` if the spec is already long), so it lives next to the story's plan and task notes:
 
 ```markdown
 ## Design

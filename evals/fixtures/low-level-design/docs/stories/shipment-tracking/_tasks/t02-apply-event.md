@@ -1,10 +1,25 @@
 ---
-id: t02-apply-event
-story: shipment-tracking
-status: pending
-depends_on: [t01-webhook-route]
-design_refs: [C3, C4, C5, C6]
-owner:
+pm-task: true
+projectId: "[[shipment-tracking|Shipment tracking]]"
+parentId:
+id: d9f4a6e2mgcu4h3b
+title: "T02 apply event"
+type: task
+status: todo
+priority: medium
+start: ""
+due: ""
+progress: 0
+assignees: []
+tags:
+  - story/shipment-tracking
+subtaskIds: []
+dependencies:
+  - "[[t01-webhook-route|T01 webhook route]]"
+createdAt: 2026-09-01T09:00:00.000Z
+updatedAt: 2026-09-01T09:00:00.000Z
+customFields:
+  design_refs: "C3, C4, C5, C6"
 ---
 
 ## Task t02-apply-event: Worker applies a stored event to the shipment status
@@ -24,4 +39,10 @@ owner:
 
 ## Design
 
+## Summary
+
+## Checklist
+
 ## Log
+
+Project: [[shipment-tracking|Shipment tracking]]
