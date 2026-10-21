@@ -84,6 +84,7 @@ Run the `grill-me` skill over the open decisions: rounds of numbered questions w
 - Fill the cells with evidence: measured, looked up, or quoted from the code or spec. Mark guesses `(est.)`.
 - The "choose … instead if" line is required. It tells the user which assumption the recommendation rests on.
 - Only the closing "Proceed?" question skips the table.
+- Name a planned task by its absolute note path in backticks (`work-state.sh path <story-id> <task-id>`), as `rules/task-paths-in-grill.md` describes, so the user's viewer can open it.
 
 **Ask the approach, not just the details.** For a bug, or any change where more than one approach is plausible, the first round includes the approach as a decision brief. For example: "copy the vendor files into the repo" vs "install and bundle them", compared on effort, risk, and reversibility. Never pick the approach silently.
 

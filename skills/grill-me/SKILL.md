@@ -30,6 +30,8 @@ Format a round like so:
 
 Every question gets the trade-off table, with at least two real options, cells backed by evidence (guesses marked "(est.)"), and the condition that would flip your recommendation. The user should be able to disagree with you from the table alone. A plain yes/no confirmation ("Proceed?") is the only exception. **Hinges on** names facts or priorities, never another open question. If a question hinges on an answer you haven't heard yet, it belongs to a later round.
 
+When a question names a planned task, write its absolute note path in backticks, the path `work-state.sh path <story-id> <task-id>` prints, e.g. T02 (`/abs/path/_tasks/t02-apply-event.md`). The user opens tasks from that path. A wikilink or a bare id doesn't link.
+
 Each round the user answers reshapes the tree: settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
 
 Finding _facts_ is your job, never the user's. When a frontier question needs a fact from the environment (filesystem, tools, etc.), dispatch a sub-agent to find it; don't ask the user for anything you could look up yourself. Don't block on it: a running exploration is an unsettled prerequisite, so only the questions downstream of it wait for the sub-agent to report; ask the rest of the frontier now. The _decisions_ are the user's: put each to them and wait.
