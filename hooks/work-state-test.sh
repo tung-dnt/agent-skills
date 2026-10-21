@@ -21,6 +21,8 @@ ok()    { PASS=$((PASS + 1)); printf '  ✓ %s\n' "$1"; }
 bad()   { FAIL=$((FAIL + 1)); printf '  ✗ %s\n' "$1"; printf '%s\n' "$2" | sed 's/^/      /'; }
 has()   { if printf '%s' "$2" | grep -qF -- "$3"; then ok "$1"; else bad "$1" "$2"; fi; }
 lacks() { if printf '%s' "$2" | grep -qF -- "$3"; then bad "$1" "$2"; else ok "$1"; fi; }
+is()    { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1" "got:  $2
+want: $3"; fi; }
 ws()    { "$BASH_BIN" "$SCRIPT" "$@" 2>&1 || true; }
 code()  { set +e; "$BASH_BIN" "$SCRIPT" "$@" >/dev/null 2>&1; echo $?; set -e; }
 
@@ -112,6 +114,28 @@ has "project note lists tasks in order" "$(sed -n '/^## Tasks/,$p' docs/stories/
 has "a duplicate task is refused" "$(ws new-task pay 'T01 model')" "already exists"
 has "an unknown dependency is refused" "$(ws new-task pay 'T03 docs' t09-nope)" "unknown dependency pay/t09-nope"
 has "titles slug to link-safe ids" "$(ws new-task pay 'T04 Fix: a/b, "x"=y +z')" 'task=t04-fix-a-b-x-y-z'
+# dotpm names a task note from its title and, when that isn't the file's name,
+# saves a second note and trashes ours, so the task id would change. dotpm_name is
+# its rule (YamlSerializer.taskSlug): the stored title must give the id back.
+dotpm_name() { printf '%s' "$1" | sed 's/[\\/:*?"<>|]/-/g' | tr '[:upper:]' '[:lower:]' | sed -E 's/[[:space:]]+/-/g' | cut -c1-60; }
+stored_title() { sed -n 's/^title: "\(.*\)"$/\1/p' "$(note pay "$1")"; }
+check_title() { # title [expected id]
+  local id stored
+  id=$(ws new-task pay "$1" | sed -n 's/^task=//p')
+  stored=$(stored_title "$id")
+  if [ -z "${2:-}" ]; then ok "'$1' is stored as '$stored'"; else is "id of '$1'" "$id" "$2"; fi
+  is "dotpm names '$stored' like its file" "$(dotpm_name "$stored")" "$id"
+  if printf '%s' "$id" | grep -Eq '^[a-z0-9]+(-[a-z0-9]+)*$'; then ok "'$id' is link-safe"; else bad "'$id' is link-safe" "$id"; fi
+}
+check_title 'T05 Add: status endpoint' t05-add-status-endpoint
+check_title 'T06 Retry 5xx (backoff)' t06-retry-5xx-backoff
+check_title "T07 Fix user's cart" t07-fix-user-s-cart
+check_title 'T08 Upgrade to v1.2' t08-upgrade-to-v1-2
+check_title 'T09 aaaaaaaaaa bbbbbbbbbb cccccccccc dddddddddd eeeeeeeeeee tail' t09-aaaaaaaaaa-bbbbbbbbbb-cccccccccc-dddddddddd-eeeeeeeeeee
+viet=""
+if [ "$(printf 'ế' | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null)" = e ]; then viet=t10-them-diem-cuoi-trang-thai; fi
+check_title 'T10 Thêm điểm cuối trạng thái' "$viet"
+has "a title with no letters or digits gives no id" "$(ws new-task pay '?!')" "gives no usable task id"
 has "path prints the task note" "$(ws path pay t01-model)" "$TMP/notes/docs/stories/pay/_tasks/t01-model.md"
 has "path prints the story directory" "$(ws path pay)" "$TMP/notes/docs/stories/pay"
 
@@ -285,7 +309,7 @@ git merge --quiet --no-edit feat-cart
 has "done and merged work branch asks for release" "$(ws status shop)" "merged, release the lock"
 
 echo "two machines"
-git init --quiet --bare "$TMP/remote.git"
+git init --quiet --bare -b main "$TMP/remote.git"
 new_repo seed
 story api 'API'
 task api 'T01 a'
@@ -319,6 +343,14 @@ git remote set-url origin "$TMP/remote.git" && git remote set-url --push origin 
 mkdir -p .git/hooks && printf '#!/bin/sh\nexit 1\n' > .git/hooks/pre-push && chmod +x .git/hooks/pre-push
 has "pre-push hook does not block a claim" "$(ws claim api t02-b)" "claimed: api/t02-b"
 rm -f .git/hooks/pre-push
+# A claim is a lock, not a push of this branch: local commits stay local.
+ws release api t02-b >/dev/null
+git commit --quiet --allow-empty -m "local WIP, never pushed"
+wip=$(git rev-parse HEAD)
+has "a claim is published on top of unpushed commits" "$(ws claim api t02-b)" "claimed: api/t02-b"
+has "the claim reached the remote" "$(git -C "$TMP/remote.git" for-each-ref --format='%(refname)' refs/heads/claim)" "refs/heads/claim/api/t02-b"
+if git -C "$TMP/remote.git" cat-file -e "$wip^{commit}" 2>/dev/null; then bad "a claim uploads no unpushed local commit" "the remote has $wip"; else ok "a claim uploads no unpushed local commit"; fi
+is "the published claim has no parent" "$(git -C "$TMP/remote.git" rev-list --parents -n 1 refs/heads/claim/api/t02-b | wc -w | tr -d ' ')" "1"
 
 echo "hint"
 new_repo hint
@@ -462,9 +494,19 @@ has "a second migrate finds nothing" "$(ws migrate)" "nothing to migrate"
 mkdir -p docs/stories/live/tasks
 printf -- '---\nid: t01-x\nstatus: claimed\n---\n' > docs/stories/live/tasks/t01-x.md
 git add -A && git commit --quiet -m live
-c=$(git commit-tree "$(git rev-parse 'HEAD^{tree}')" -p HEAD -m "claim live/t01-x work=feat-x id=1")
+c=$(git commit-tree "$(git mktree </dev/null)" -m "claim live/t01-x work=feat-x id=1")
 git update-ref refs/heads/claim/live/t01-x "$c"
 has "a story with live claims is skipped" "$(ws migrate)" "skipped: live has live claims"
+# A claim another machine holds shows up as a remote-tracking ref.
+mkdir -p docs/stories/away/tasks
+printf -- '---\nid: t01-y\nstatus: pending\n---\n' > docs/stories/away/tasks/t01-y.md
+git update-ref refs/remotes/origin/claim/away/t01-y "$c"
+has "a claim held on the remote also skips a story" "$(ws migrate)" "skipped: away has live claims (origin/claim/away/t01-y)"
+# A task id with quotes or backslashes must not break the project note's YAML.
+mkdir -p docs/stories/odd/tasks
+printf -- '---\nid: odd\nstatus: pending\n---\n' > 'docs/stories/odd/tasks/t01-say-"hi"-a\b.md'
+ws migrate >/dev/null
+has "links in the project note's taskIds are YAML-escaped" "$(cat docs/stories/odd/odd.md)" 'taskIds: ["[[t01-say-\"hi\"-a\\b|t01-say-\"hi\"-a\\b]]"]'
 
 echo "migrate (vault store)"
 V2="$TMP/vault-two"
@@ -497,6 +539,43 @@ out=$(ws migrate)
 lacks "an epics dir inside the stories dir is not a story" "$out" "story epics"
 has "it migrates as the epics dir" "$out" "migrated: epic e1"
 has "the nested layout is fully moved" "[$(ls -A .stories 2>/dev/null || true)]" "[]"
+
+echo "migrate (vault store, repository notes already in dotpm format)"
+no_vault
+new_repo mdot
+ws init-epic payments 'Payments epic' >/dev/null
+story pay 'Payments' payments
+task pay 'T01 model'
+task pay 'T02 api' t01-model
+set_status pay t01-model done
+git add -A && git commit --quiet -m plan
+git worktree add --quiet -b feat-api "$TMP/mdot-api"
+ws claim pay t02-api feat-api >/dev/null
+ws log pay t02-api "handler written" >/dev/null
+V3="$TMP/vault-three"
+new_vault "$V3"
+has "root flags a story left in the repository" "$(ws root)" "old task layout"
+has "vault migrate skips a story with live claims" "$(ws migrate)" "skipped: pay has live claims"
+has "its notes stay in the repository" "$(ls docs/stories/pay/_tasks)" "t02-api.md"
+has "and nothing is copied to the vault" "[$(ls "$V3/Projects/mdot/stories" 2>/dev/null || true)]" "[]"
+# The work is finished: merged into the base branch, then the claim is released.
+(cd "$TMP/mdot-api" && git add -A && git commit --quiet -m "t02 progress")
+git merge --quiet --no-edit feat-api
+ws release pay t02-api >/dev/null
+has "a released story moves to the vault" "$(ws migrate)" "migrated: story pay → $V3/Projects/mdot/stories/pay"
+t=$(cat "$V3/Projects/mdot/stories/pay/_tasks/t02-api.md")
+has "the merged progress comes along" "$t" "handler written"
+has "the task links its project by vault path" "$t" 'projectId: "[[Projects/mdot/stories/pay/pay|Payments]]"'
+has "its dependencies carry vault paths" "$t" '  - "[[Projects/mdot/stories/pay/_tasks/t01-model|T01 model]]"'
+has "its footer carries the vault path" "$(tail -n 1 "$V3/Projects/mdot/stories/pay/_tasks/t02-api.md")" "Project: [[Projects/mdot/stories/pay/pay|Payments]]"
+p=$(cat "$V3/Projects/mdot/stories/pay/pay.md")
+has "taskIds carry vault paths" "$p" 'taskIds: ["[[Projects/mdot/stories/pay/_tasks/t01-model|T01 model]]", "[[Projects/mdot/stories/pay/_tasks/t02-api|T02 api]]"]'
+has "finished tasks are ticked in the project note" "$p" "- [x] [[Projects/mdot/stories/pay/_tasks/t01-model|T01 model]]"
+has "open tasks stay open" "$p" "- [ ] [[Projects/mdot/stories/pay/_tasks/t02-api|T02 api]]"
+has "the story links its epic by vault path" "$p" 'parent: "[[Projects/mdot/epics/payments/payments]]"'
+set_status pay t02-api done
+has "done ticks a moved task" "$(cat "$V3/Projects/mdot/stories/pay/pay.md")" "- [x] [[Projects/mdot/stories/pay/_tasks/t02-api|T02 api]]"
+has "the repository copy is gone" "$(ws migrate)" "nothing to migrate"
 
 echo
 echo "Results: $PASS passed, $FAIL failed"

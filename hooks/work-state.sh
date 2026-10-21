@@ -11,7 +11,8 @@
 #   work-state.sh configure DIR [EPICS_DIR]   write the repo-store dirs to .agent-skills.json
 #   work-state.sh init-epic EPIC TITLE        create the epic's project note
 #   work-state.sh init-story STORY TITLE [EPIC]  create the story's project note
-#   work-state.sh new-task STORY TITLE [DEP...]  create a task note; its id is the title's slug
+#   work-state.sh new-task STORY TITLE [DEP...]  create a task note; the title keeps letters and
+#                                             digits only, and its slug is the id
 #   work-state.sh path STORY [TASK]           story directory, or the freshest writable task note
 #   work-state.sh field STORY TASK KEY VALUE  set customFields.KEY on a task
 #   work-state.sh set STORY TASK STATUS       todo | in-progress | blocked | review | done | cancelled
@@ -29,12 +30,14 @@
 #   work-state.sh migrate [STORY-ID]          convert the old tasks/*.md layout into the store
 #   work-state.sh hint                        SessionStart JSON when claims exist; silent otherwise
 #
-# A claim is the ref refs/heads/claim/STORY/TASK pointing at a unique empty
-# commit whose message records the work branch and a claim id. Creating it with
-# `git update-ref REF NEW ""` is atomic in one repository; pushing it with an
-# empty --force-with-lease is atomic on the remote. The lock never carries work.
+# A claim is the ref refs/heads/claim/STORY/TASK pointing at a unique commit with
+# no parent and no files, whose message records the work branch and a claim id.
+# Creating it with `git update-ref REF NEW ""` is atomic in one repository;
+# pushing it with an empty --force-with-lease is atomic on the remote. The lock
+# never carries work: it has no history, so publishing it uploads nothing else.
 #
-# Portable to bash 3.2 (macOS) and needs only git, sed, and awk.
+# Portable to bash 3.2 (macOS) and needs only git, sed, and awk. iconv, when
+# present, transliterates accents in task titles.
 
 set -e
 
@@ -185,8 +188,21 @@ pm_id() {
 # a-z0-9 becomes one "-", no leading or trailing "-", at most 60 characters.
 # Ids stay link-safe: herdr web stops linking a path at "," or "=".
 slug() {
-  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | LC_ALL=C sed -E 's/[^a-z0-9]+/-/g; s/^-+//' \
+  printf '%s' "$1" | LC_ALL=C tr 'A-Z' 'a-z' | LC_ALL=C sed -E 's/[^a-z0-9]+/-/g; s/^-+//' \
     | cut -c1-60 | sed -E 's/-+$//'
+}
+
+# The title a task is stored under. dotpm names a task note from its title
+# (lowercase; \ / : * ? " < > | and whitespace become "-"; 60 characters at
+# most), and when that isn't the file's name it saves a second note under its own
+# and trashes ours, which changes the task id. So the stored title is letters,
+# digits, and single spaces: accents are transliterated first where iconv can,
+# every other run of characters becomes one space, and it is cut at 60 characters.
+# Its dotpm name is then its slug, which is the id.
+task_title() {
+  local t="$1" a
+  if a="$(printf '%s' "$t" | iconv -f utf-8 -t ascii//TRANSLIT 2>/dev/null)"; then t="$a"; fi
+  printf '%s' "$t" | LC_ALL=C tr -c 'A-Za-z0-9' ' ' | tr -s ' ' | sed 's/^ //' | cut -c1-60 | sed 's/ $//'
 }
 
 # A title whose slug is ID ("t02-apply-event" → "T02 apply event"), else ID.
@@ -409,8 +425,8 @@ write_project() {
 
 # Add LINK to a project note's taskIds and to its "## Tasks" list.
 project_add_task() {
-  LINK="$2" awk '
-    BEGIN { link = ENVIRON["LINK"]; ql = "\"" link "\"" }
+  LINK="$2" QL="$(q "$2")" awk '
+    BEGIN { link = ENVIRON["LINK"]; ql = ENVIRON["QL"] }
     { a[NR] = $0 }
     END {
       t = 0; e = 0
@@ -526,7 +542,7 @@ cmd_claim() {
   if [ -n "$(claim_ref "$story" "$task")" ]; then echo "taken: $story/$task"; exit 3; fi
   # A unique id per claim: the session that made it holds the id; nobody else can.
   id="$(date -u +%Y%m%dT%H%M%SZ)-$$-${RANDOM:-0}${RANDOM:-0}"
-  c="$(git commit-tree "$(git rev-parse 'HEAD^{tree}')" -p HEAD \
+  c="$(git commit-tree "$(git mktree </dev/null)" \
         -m "claim $story/$task work=$work id=$id host=$(hostname 2>/dev/null || echo unknown)")"
   if ! git update-ref "$ref" "$c" "" 2>/dev/null; then echo "taken: $story/$task"; exit 3; fi
   r="$(remote_name)"
@@ -666,13 +682,14 @@ write_task() {
 }
 
 cmd_new_task() {
-  local story="$1" title="$2" id file dep deps=""
-  valid_id "$story" && [ -n "$title" ] || die "usage: work-state.sh new-task STORY TITLE [DEP-ID...]"
+  local story="$1" given="$2" title id file dep deps=""
+  valid_id "$story" && [ -n "$given" ] || die "usage: work-state.sh new-task STORY TITLE [DEP-ID...]"
   shift 2
   resolve
   [ -f "$STORIES/$story/$story.md" ] || die "no project note for story '$story'; run work-state.sh init-story first"
+  title="$(task_title "$given")"
   id="$(slug "$title")"
-  valid_id "$id" || die "title '$title' gives no usable task id"
+  valid_id "$id" || die "title '$given' gives no usable task id"
   file="$STORIES/$story/_tasks/$id.md"
   [ ! -f "$file" ] || die "task $story/$id already exists"
   for dep in "$@"; do
@@ -1064,17 +1081,65 @@ migrate_deps() {
   done
 }
 
+# A story copied from the repo store still has bare wikilinks. Rewrite the ones
+# that name its project note, its tasks, or its epic to the vault-path links
+# `link` writes, and tick its finished tasks in the project note.
+vault_relink() {
+  local story="$1" dir="$STORIES/$1" tab map="" f epic
+  [ -f "$dir/$story.md" ] || return 0
+  tab="$(printf '\t')"
+  epic="$(story_epic "$story")"
+  if [ -n "$epic" ] && [ -f "$EPICS/$epic/$epic.md" ]; then
+    map="$epic$tab$(link_target "$EPICS/$epic/$epic.md")
+"
+  fi
+  for f in "$dir/$story.md" "$dir"/_tasks/*.md; do
+    [ -f "$f" ] || continue
+    map="$map$(basename "$f" .md)$tab$(link_target "$f")
+"
+  done
+  for f in "$dir/$story.md" "$dir"/_tasks/*.md; do
+    [ -f "$f" ] || continue
+    MAP="$map" awk '
+      BEGIN {
+        n = split(ENVIRON["MAP"], rows, "\n")
+        for (i = 1; i <= n; i++) if ((t = index(rows[i], "\t")) > 0) path[substr(rows[i], 1, t - 1)] = substr(rows[i], t + 1)
+      }
+      {
+        out = ""; rest = $0
+        while ((i = index(rest, "[[")) > 0) {
+          out = out substr(rest, 1, i + 1); rest = substr(rest, i + 2)
+          if ((j = index(rest, "]]")) == 0) break
+          inner = substr(rest, 1, j - 1); rest = substr(rest, j)
+          bar = index(inner, "|")
+          name = bar ? substr(inner, 1, bar - 1) : inner
+          if (name in path) inner = path[name] (bar ? substr(inner, bar) : "")
+          out = out inner
+        }
+        print out rest
+      }' "$f" | replace "$f"
+  done
+  for f in "$dir"/_tasks/*.md; do
+    [ -f "$f" ] || continue
+    if complete "$(fm status < "$f")"; then project_tick "$dir/$story.md" "$(link_target "$f")" x; fi
+  done
+}
+
 migrate_story() {
   local story="$1" src="$OLD_STORIES/$1" dest="$STORIES/$1" epic title f claims
   if [ "$STORE" = repo ]; then
     [ -d "$src/tasks" ] || return 0
-    claims="$(git for-each-ref --format='%(refname:short)' "refs/heads/$NS/$story" "refs/remotes/*/$NS/$story" || true)"
-    if [ -n "$claims" ]; then
-      echo "skipped: $story has live claims ($(printf '%s' "$claims" | tr '\n' ' ')); finish or release them, then migrate"
-      return 0
-    fi
   else
     [ ! -e "$dest" ] || die "$dest already exists; move it aside before migrating $story"
+  fi
+  # A claimed task's freshest note is in its work branch's worktree, not in this
+  # checkout, so a story with live claims waits until they are released.
+  claims="$(git for-each-ref --format='%(refname:short)' "refs/heads/$NS/$story/*" "refs/remotes/*/$NS/$story/*" || true)"
+  if [ -n "$claims" ]; then
+    echo "skipped: $story has live claims ($(printf '%s' "$claims" | tr '\n' ' ')); finish or release them, then migrate"
+    return 0
+  fi
+  if [ "$STORE" = vault ]; then
     mkdir -p "$dest"
     (cd "$src" && find . -path ./tasks -prune -o -type f -print) | while read -r f; do
       mkdir -p "$dest/$(dirname "$f")"
@@ -1100,6 +1165,7 @@ migrate_story() {
     migrate_deps "$story"
   fi
   if [ "$STORE" = vault ]; then
+    vault_relink "$story"
     rm -rf "$src"
     echo "migrated: story $story → $dest (removed ${src#"$ROOT"/} from the repository; commit the deletion)"
   else
