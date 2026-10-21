@@ -93,7 +93,7 @@ The layout is the same in both stores:
 ```
 
 - **`story-id`** — kebab-case, chosen once and never renamed. Use the tracker key when one exists (`pac2-8120`), otherwise a short slug (`shipment-tracking`).
-- **`task-id`** — the file name of the task note: the slug of its title. Titles start with the plan number (`T02 Apply event`), so ids read `t01`, `t02`, … in plan order plus a slug: `t02-apply-event`. `new-task` derives the id from the title. Ids are never reused or renumbered after the plan is approved; a task added later takes the next free number.
+- **`task-id`** — the file name of the task note: the slug of its title. Titles start with the plan number (`T02 Apply event`), so ids read `t01`, `t02`, … in plan order plus a slug: `t02-apply-event`. `new-task` derives the id from the title, which it stores without punctuation so that dotpm keeps the id (see Obsidian (dotpm) Compatibility). Ids are never reused or renumbered after the plan is approved; a task added later takes the next free number.
 - **Project notes** (`[story-id].md`, `[epic-id].md`) hold no content. The Obsidian plugin rewrites their body whenever it saves them, so requirements, designs and plans stay in `epic.md`, `spec.md` and `plan.md`.
 - **Epics** are optional. A story belongs to an epic when its project note's `parent` links it, set by `init-story [story-id] "[title]" [epic-id]`.
 - A project-level spec (the whole product, or a capability map with module specs) stays at `SPEC.md` in the project root. Stories reference it; they don't copy it.
@@ -117,7 +117,7 @@ Within a task note, two kinds of writes never mix:
 
 ## Task Note
 
-The task note is created only by `work-state.sh new-task [story-id] "[title]" [dep-id…]`, which prints `task=[task-id]` and `path=<absolute path>`. It fails when the story's project note doesn't exist (run `init-story` first) or the id is taken.
+The task note is created only by `work-state.sh new-task [story-id] "[title]" [dep-id…]`, which prints `task=[task-id]` and `path=<absolute path>`. It fails when the story's project note doesn't exist (run `init-story` first) or the id is taken. It stores the title as letters and digits separated by single spaces (`T04 Fix: a/b` becomes `T04 Fix a b`), so the title and the id name the same file.
 
 ```markdown
 ---
@@ -164,14 +164,14 @@ Project: [[shipment-tracking|Shipment tracking]]
 - **`dependencies`** lists the task ids this task waits for; `next` starts a task only when all of them are complete.
 - **`customFields`** holds the agent-only data: `design_refs` (shared contract ids from the design, e.g. `C3, C4`), `branch` (the claim's work branch), and `design_approved` (written by `approve`; the fingerprint covers `## Design` only).
 - **`title`** is the single source of the file name, so never edit it by hand.
-- **`## Checklist`** is an optional list the owner ticks while building (`- [ ] adapter`, `- [x] schema`); `progress` follows the ticked share. **`## Log`** holds one line per session: `- YYYY-MM-DD what changed, what's next`. Add lines with `work-state.sh log`.
+- **`## Checklist`** is an optional list the owner ticks while building (`- [ ] adapter`, `- [x] schema`); `progress` follows the ticked share. **`## Log`** holds one line per meaningful step or decision, the user's answers at an `ask` included: `- YYYY-MM-DD what changed or was decided, what's next`. Add lines with `work-state.sh log`, and always one before stopping for any reason, so the next session can pick up from it. This is the one logging rule; commands and agents follow it.
 - The trailing `Project: [[…]]` line belongs to the Obsidian plugin; keep it.
 
-`planning-and-task-breakdown` creates every task note with `new-task` when the plan is written, and inserts the Step 4 structure as the body above `## Design`. `low-level-design` fills `## Design`. The builder moves state with `claim`, `log`, and `set`, ticks `## Checklist`, and writes a log line before stopping for any reason, so the next session can pick up from it.
+`planning-and-task-breakdown` creates every task note with `new-task` when the plan is written, and inserts the Step 4 structure as the body above `## Design`. `low-level-design` fills `## Design`. The builder moves state with `claim`, `log`, and `set`, ticks `## Checklist`, and logs as above.
 
 ## Claim Protocol
 
-A claim is a **lock ref**, `claim/[story-id]/[task-id]`, pointing at a unique empty commit whose message records the claimer's work branch. The lock is separate from the branch the work happens on. That keeps it valid whether sessions share one checkout or use a worktree each, and a feature branch named after the story (`pac2-8120`) can't collide with it. `work-state.sh` does the git work:
+A claim is a **lock ref**, `claim/[story-id]/[task-id]`, pointing at a unique commit with no parent and no files, whose message records the claimer's work branch. It carries no history, so publishing it never uploads local commits. The lock is separate from the branch the work happens on. That keeps it valid whether sessions share one checkout or use a worktree each, and a feature branch named after the story (`pac2-8120`) can't collide with it. `work-state.sh` does the git work:
 
 | Step | Command | What it does |
 |---|---|---|
@@ -185,7 +185,7 @@ Before picking, bring the base branch up to date (`git pull --ff-only`) so tasks
 
 - *Worktree per task:* `git worktree add -b [work-branch] ../[repo]-[task-id]`, claim with that work branch, and build there.
 - *Same checkout:* claim with the current branch and build in place. Other sessions share this checkout's git index, so commit only your own paths: `git commit -- <code paths>`, plus the task note in the repo store (`git commit -- <task note> <code paths>`). Get the note's path from `work-state.sh path [story-id] [task-id]`.
-- `claim` has already set `in-progress` and the branch, unless it printed a `set … in-progress` command for a worktree that didn't exist yet: run that from the worktree. Don't set them again. Tick `## Checklist` and add `work-state.sh log` lines as you go, and always before stopping.
+- `claim` has already set `in-progress` and the branch, unless it printed a `set … in-progress` command for a worktree that didn't exist yet: run that from the worktree. Don't set them again. Tick `## Checklist` and log by the `## Log` rule above.
 - Where the store is the repo, a claimed task's note is read and written in the work branch's worktree first (it's the freshest copy). The vault store has a single copy, shared by every worktree.
 
 **Finishing:** run `work-state.sh set [story-id] [task-id] done`, then commit the task's code (repo store: with the task note; vault store: the note isn't in git, so there's nothing more to commit for it). Release the lock once the work is on the base branch, which is where `next` looks:
@@ -203,7 +203,7 @@ The vault store has no git history for task notes, so `done` is visible there th
 **Without the script** (another agent host, or a per-skill install), run the same git commands by hand:
 ```
 git fetch --prune
-c=$(git commit-tree "$(git rev-parse 'HEAD^{tree}')" -p HEAD -m "claim [story-id]/[task-id] work=[work-branch]")
+c=$(git commit-tree "$(git mktree </dev/null)" -m "claim [story-id]/[task-id] work=[work-branch]")
 git update-ref refs/heads/claim/[story-id]/[task-id] "$c" ""      # fails → taken
 git push --force-with-lease=refs/heads/claim/[story-id]/[task-id]: origin refs/heads/claim/[story-id]/[task-id]   # fails → taken; delete the local ref
 ```
@@ -248,7 +248,7 @@ A new session in Claude Code also gets a one-line hint at startup when claims ex
 The notes follow the format of the Obsidian project-manager plugin ("dotpm"), so a vault shows stories as projects and tasks as tasks. A few of its behaviors shape the rules above:
 
 - **Regenerated bodies.** On save, dotpm rewrites a project note's body (heading, description, `## Tasks`) and deletes everything in a task note from a `## Subtasks` heading to the end, regenerating it from child notes. So project notes carry no content, and task notes use `## Checklist`, never `## Subtasks`.
-- **Title ↔ file name.** dotpm names a task note from its title: lowercase, `\ / : * ? " < > |` and whitespace become `-`, at most 60 characters. `T02 Apply event` is `t02-apply-event`, and `new-task` derives the task id this way. Renaming a title by hand makes dotpm rename the file and breaks the id.
+- **Title ↔ file name.** dotpm names a task note from its title (lowercase; `\ / : * ? " < > |` and whitespace become `-`; at most 60 characters). When a saved task's title no longer gives its file's name, dotpm creates a note under its own name and trashes the old one, which silently changes the task id. So `new-task` stores the title as letters and digits separated by single spaces (accents are transliterated first when `iconv` is available) and cuts it at 60 characters: `T04 Fix: a/b, (x)` is stored as `T04 Fix a b x`, which dotpm names `t04-fix-a-b-x`, the task id. Ids use only `a-z`, `0-9`, and single dashes, so herdr web links their paths. Never edit a `title` by hand.
 - **Statuses.** `todo`, `in-progress`, `blocked`, `review`, `done`, `cancelled`; complete means `done` or `cancelled`.
 - **No git history in a vault.** A vault store's task notes aren't in the repository, so there is no merged-branch signal for them. `next` relies on released locks instead: a dependency counts only when it is complete and its claim is gone.
 - **Custom fields.** `design_refs`, `branch`, and `design_approved` live in `customFields`; the story's project note declares them so dotpm displays them.
@@ -260,4 +260,4 @@ When the project designates an issue tracker, each task is a tracker item instea
 
 ## Legacy Layout
 
-A repository that already has `tasks/plan.md` and `tasks/todo.md` from an earlier plan keeps working: finish or discard that plan in the old single-file layout, since it is not safe for parallel sessions. New plans use `[stories-dir]` (`docs/stories/` in the repo store by default). A repository whose stories use `[stories-dir]/[story-id]/tasks/*.md` is converted with `work-state.sh migrate [story-id]`.
+A repository that already has `tasks/plan.md` and `tasks/todo.md` from an earlier plan keeps working: finish or discard that plan in the old single-file layout, since it is not safe for parallel sessions. New plans use `[stories-dir]` (`docs/stories/` in the repo store by default). A repository whose stories use `[stories-dir]/[story-id]/tasks/*.md` is converted with `work-state.sh migrate [story-id]`. With the vault store, `migrate` also moves stories and epics still in the repository into the vault, rewriting their links to vault paths. In either store it skips a story with live claims: finish or release them first.
