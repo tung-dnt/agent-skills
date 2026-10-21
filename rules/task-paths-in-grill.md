@@ -10,6 +10,6 @@ Whenever you mention a planned task (one with a task note from a breakdown) duri
 
 - Get the path from `work-state.sh path <story-id> <task-id>`; it prints the absolute path in both the repo store and the vault store. Never type the path from memory.
 - Format: T02 Apply event (`/abs/path/to/_tasks/t02-apply-event.md`). Put it in the question body or the options-table cell that names the task, as an inline code span, not inside a fenced block.
-- With the `ask` tool: herdr web does not link anything inside the dialog (question text, labels, descriptions; verified 2026-10-21). Put each task path in the chat message just before the call; that is the only clickable copy. Repeating it in the `question` text is fine for context, but never rely on it, and never put a path in an option label or description: a tap there answers the question.
+- With the `ask` tool: herdr web shows nothing written in the same turn before an `ask` call, and links nothing inside the dialog (verified 2026-10-21). So end the turn with a chat reply that cites each task path, then call `ask` on the next turn. Never put a path in an option label or description: a tap there answers the question.
 - Several tasks in one question: cite each one. A story or plan as a whole: cite `spec.md` / `plan.md` by absolute path in the same way.
 - A task that has no note yet (proposed, not created): say so ("no note yet") instead of making up a path.
