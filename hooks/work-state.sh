@@ -181,11 +181,12 @@ pm_id() {
     print r s }'
 }
 
-# dotpm's file name for a title: \ / : * ? " < > | become "-", lowercase,
-# whitespace runs become "-", at most 60 characters.
+# A task id from its title: lowercase, every run of characters other than
+# a-z0-9 becomes one "-", no leading or trailing "-", at most 60 characters.
+# Ids stay link-safe: herdr web stops linking a path at "," or "=".
 slug() {
-  printf '%s' "$1" | sed 's/[\\/:*?"<>|]/-/g' | tr '[:upper:]' '[:lower:]' \
-    | sed -E 's/[[:space:]]+/-/g' | cut -c1-60
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | LC_ALL=C sed -E 's/[^a-z0-9]+/-/g; s/^-+//' \
+    | cut -c1-60 | sed -E 's/-+$//'
 }
 
 # A title whose slug is ID ("t02-apply-event" → "T02 apply event"), else ID.

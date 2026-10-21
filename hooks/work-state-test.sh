@@ -111,7 +111,7 @@ has "project note lists tasks in order" "$(sed -n '/^## Tasks/,$p' docs/stories/
 - [ ] [[t02-api|T02 api]]"
 has "a duplicate task is refused" "$(ws new-task pay 'T01 model')" "already exists"
 has "an unknown dependency is refused" "$(ws new-task pay 'T03 docs' t09-nope)" "unknown dependency pay/t09-nope"
-has "titles slug like dotpm" "$(ws new-task pay 'T04 Fix: a/b  "x"')" 'task=t04-fix--a-b--x-'
+has "titles slug to link-safe ids" "$(ws new-task pay 'T04 Fix: a/b, "x"=y +z')" 'task=t04-fix-a-b-x-y-z'
 has "path prints the task note" "$(ws path pay t01-model)" "$TMP/notes/docs/stories/pay/_tasks/t01-model.md"
 has "path prints the story directory" "$(ws path pay)" "$TMP/notes/docs/stories/pay"
 
