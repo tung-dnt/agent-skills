@@ -29,6 +29,8 @@ At each checkpoint:
 
 A checkpoint is lighter than the gate: no catch-up summary and no record. The gate still runs at the end of the design over the whole result. Its grill asks only what is still open, plus "Proceed?". Never re-ask what a checkpoint already settled.
 
+**Jev shadow check** (`../hooks/JEV-SHADOW.md`). Once per session, run `bash [plugin-root]/hooks/jev.sh status`; if it prints `enabled=false`, skip this for the rest of the session. Otherwise, at a design-step checkpoint (not an investigation), before asking, pipe the step's text to `bash [plugin-root]/hooks/jev.sh checkpoint - --step "N/M <name>" --story [story-id]` (add `--task [task-id]` at task scope). If it printed `jev=<id>`, then after the reply run `jev.sh outcome <id> decision` when the checkpoint asked a decision brief or the reply changed the step, otherwise `jev.sh outcome <id> none`. `jev=skipped` means do nothing more. Never let the answer change the checkpoint: ask exactly what this section says.
+
 A checkpoint holds the user's attention, so it needs the main thread. Subagents can read, investigate, and critique between checkpoints, but the main thread writes each design step.
 
 ## The Three Steps
