@@ -10,5 +10,6 @@ Whenever you mention a planned task (one with a task note from a breakdown) duri
 
 - Get the path from `work-state.sh path <story-id> <task-id>`; it prints the absolute path in both the repo store and the vault store. Never type the path from memory.
 - Format: T02 Apply event (`/abs/path/to/_tasks/t02-apply-event.md`). Put it in the question body or the options-table cell that names the task, as an inline code span, not inside a fenced block.
+- With the `ask` tool: put each task path in the `question` text, which herdr web links, and also in the chat message just before the call. Never put a path only in an option label or description: there it is plain text, and a tap on it answers the question.
 - Several tasks in one question: cite each one. A story or plan as a whole: cite `spec.md` / `plan.md` by absolute path in the same way.
 - A task that has no note yet (proposed, not created): say so ("no note yet") instead of making up a path.

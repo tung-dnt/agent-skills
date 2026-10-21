@@ -30,7 +30,7 @@ Format a round like so:
 
 Every question gets the trade-off table, with at least two real options, cells backed by evidence (guesses marked "(est.)"), and the condition that would flip your recommendation. The user should be able to disagree with you from the table alone. A plain yes/no confirmation ("Proceed?") is the only exception. **Hinges on** names facts or priorities, never another open question. If a question hinges on an answer you haven't heard yet, it belongs to a later round.
 
-When a question names a planned task, write its absolute note path in backticks, the path `work-state.sh path <story-id> <task-id>` prints, e.g. T02 (`/abs/path/_tasks/t02-apply-event.md`). The user opens tasks from that path. A wikilink or a bare id doesn't link.
+When a question names a planned task, write its absolute note path in backticks, the path `work-state.sh path <story-id> <task-id>` prints, e.g. T02 (`/abs/path/_tasks/t02-apply-event.md`). The user opens tasks from that path. A wikilink or a bare id doesn't link. With the `ask` tool, the path goes in the question text and in the message before the call, never only in an option.
 
 Each round the user answers reshapes the tree: settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
 
