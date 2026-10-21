@@ -65,22 +65,10 @@ This follows the report format of the `investigate-first` workflow, so investiga
 
 Run the `grill-me` skill over the open decisions: rounds of numbered questions with recommended answers, working the design tree until the frontier is empty. Look up facts yourself (or with a read-only subagent); put only decisions to the user.
 
-**Every decision question is a decision brief**, so the user can weigh it rather than just accept a recommendation:
-
-```
-❓ **Q1 - <decision>**: <what's being decided, and why it matters now: 1–2 sentences>
-
-| Option | How it works | Pros | Cons / risks | Effort | Reversible |
-|---|---|---|---|---|---|
-| A <name> | … | … | … | S / M / L | easy / hard, and why |
-| B <name> | … | … | … | … | … |
-
-**Hinges on:** the one or two facts or priorities that decide it, tied to a requirement, constraint, or NFR. Never another open question: a question that depends on one waits for a later round.
-
-➡️ **<option>**: why it wins on what it hinges on. **Choose <other> instead if** <the condition that would flip it>.
-```
+**Every decision question is a decision brief** in the format `grill-me` defines (options table, **Hinges on**, recommendation with a "choose … instead if" flip condition), so the user can weigh it rather than just accept a recommendation. A round is one `ask` call with several questions (see `grill-me`). On top of that format:
 
 - At least two real options. Include "do nothing" or "defer" when that's genuinely viable.
+- Tie **Hinges on** to a requirement, constraint, or NFR.
 - Fill the cells with evidence: measured, looked up, or quoted from the code or spec. Mark guesses `(est.)`.
 - The "choose … instead if" line is required. It tells the user which assumption the recommendation rests on.
 - Only the closing "Proceed?" question skips the table.

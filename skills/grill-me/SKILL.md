@@ -5,9 +5,9 @@ description: Grill the user relentlessly about a plan, decision, or idea they al
 
 Interview the user relentlessly until you reach a shared understanding. Map this as a **design tree**: every decision branches into the decisions that hang off it.
 
-Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled: the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
+Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled: the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. With the `ask` tool, a round is one call whose `questions[]` holds every question of the frontier. Then wait for the user's answers before the next round.
 
-Format a round like so:
+This is the single source of the decision-brief format; other skills and references link here. Format a round like so:
 
 ```
 ❓ **Q1** - **<question title>**: <question body: what's being decided and why it matters now>
