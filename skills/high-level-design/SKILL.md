@@ -26,7 +26,7 @@ Everything local to a single task — internal functions, local edge cases — i
 **When NOT to use:**
 
 - Requirements are still unclear. Use `spec-driven-development` (or `interview-me`) first; designing against guessed requirements produces a confident wrong design.
-- The change lives inside one existing module and touches no shared contract. Go straight to `planning-and-task-breakdown`, then `low-level-design` per task.
+- The change lives inside one existing module and changes no shared contract. Go straight to `planning-and-task-breakdown`, then `low-level-design` per task. Once the user agrees to skip the design, record it with `work-state.sh approve-phase [story-id] design` (no `## Design` written), so the story's phase moves on.
 - You only need one interface's surface (fields, errors, versioning). Use `api-and-interface-design`.
 
 ## The Process
@@ -40,6 +40,7 @@ Work top-down. Finish the shape layer before the contracts layer; contracts writ
 - Read the spec. Give every functional requirement and non-functional requirement a stable id (`FR1`, `NFR1`) if it lacks one; the design traces back to these.
 - Read `CONSTRAINTS.md` if the project has one (see `constraint-driven-development`); its thresholds are non-functional requirements too.
 - Read the existing architecture: current services, data stores, integration points, and existing ADRs. Extend what exists before inventing something new. In a large codebase, delegate this reading to a fast-tier, read-only subagent that returns a short component summary, so the design context stays small. Give it the subagent command rules from `../../references/model-routing.md`, so it never stops the user with permission prompts.
+- When the story belongs to an epic, read the epic's `## Architecture` in `[epics-dir]/[epic-id]/epic.md` too. Its `E` contracts already bind the story: cite them by id instead of restating them.
 
 ### Step 2: Scope
 
@@ -107,7 +108,7 @@ Put each decision that is expensive to reverse (sync versus async, new store ver
 
 ### Step 12: Doubt, then human approval
 
-Run the design through `doubt-driven-development` with the spec as the contract, on the deep tier (the main thread's model), in a fresh context: a fresh-context reviewer looks for requirements with no design element, NFRs with no mechanism, and failure paths nobody owns. Fold the findings back in, then pass the approval gate (`../../references/approval-gate.md`): a catch-up summary, `grill-me` rounds over the decisions still open (never re-ask what a checkpoint settled), and the user's explicit go-ahead. Tasks are planned only against an approved design.
+Run the design through `doubt-driven-development` with the spec as the contract, on the deep tier (the main thread's model), in a fresh context: a fresh-context reviewer looks for requirements with no design element, NFRs with no mechanism, and failure paths nobody owns. Fold the findings back in, then pass the approval gate (`../../references/approval-gate.md`): a catch-up summary, `grill-me` rounds over the decisions still open (never re-ask what a checkpoint settled), and the user's explicit go-ahead. Record the go-ahead with `work-state.sh approve-phase [story-id] design`: the story's phase doesn't advance without it, and editing the design afterwards voids it. Tasks are planned only against an approved design.
 
 ## Output
 
@@ -141,15 +142,21 @@ AuthN, AuthZ/tenant scoping point, trust boundaries, never-logged fields
 Flag, migration order, staged rollout
 
 ### Shared contracts
-C1 API … · C2 schema … · C3 status transitions … · C4 failure policy …
+#### C1 API
+… method, path, request and response examples
+#### C2 Schema
+#### C3 Status transitions
+#### C4 Failure policy
 
 ### Decisions
 ADR links, alternatives considered
 ```
 
-Give each shared contract a stable id (`C1`, `C2`) so tasks can cite exactly what they depend on. Every component, flow, and contract should trace to at least one `FR`/`NFR` id; an element that traces to nothing is scope creep.
+Give each shared contract a stable id (`C1`, `C2`) so tasks can cite exactly what they depend on, and write it under its own heading (`#### C1 API`) with its examples and tables beneath. That heading's whole section is the contract: `work-state.sh brief` hands a task the section for each id it cites, and the task's approval covers that text, so an edit to any part of it voids the approval. A contract without a heading is read as the paragraphs that mention its id. Every component, flow, and contract should trace to at least one `FR`/`NFR` id; an element that traces to nothing is scope creep.
 
-**Keep the design alive.** When implementation reveals the design was wrong, update the `## Design` section in the same pull request as the code. A design that disagrees with the code is worse than no design.
+**At epic level**, write the architecture into the epic's `[epics-dir]/[epic-id]/epic.md` (`docs/epics/[epic-id]/epic.md` in the repo store) under `## Architecture`, with the same sub-sections, and give each contract that several stories share an id with an `E` (`E1`, `E2`). Stories keep `C1…` for their own contracts. A task cites either kind in its `design_refs` (`work-state.sh field [story-id] [task-id] design_refs "C1, E2"`), and `work-state.sh brief` and the task's approval read an `E` id from the story's parent epic.
+
+**Keep the design alive.** When implementation reveals the design was wrong, update the `## Design` section in the same pull request as the code. A design that disagrees with the code is worse than no design. Tasks were approved against the old text of a contract, so changing one has a fixed follow-up: once the user approves the change, record it (`work-state.sh approve-phase [story-id] design`), run `work-state.sh cites [story-id] [contract-id]` to list the tasks that cite the contract with their status (for an epic's `E` id, run it for each story of the epic), and re-gate each of them that isn't done: their approvals are void until they pass the gate again (`low-level-design`, step 7). A task already built against the old contract needs a new task to change it.
 
 ## Common Rationalizations
 

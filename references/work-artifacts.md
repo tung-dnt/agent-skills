@@ -43,7 +43,7 @@ Every piece of work belongs to one scope, and each scope has one entry command. 
 
 | Scope | Command | Owns | Hands off to |
 |---|---|---|---|
-| Epic / project | `/epic` | `[epics-dir]/[epic-id]/epic.md` (or `SPEC.md` for a whole product), `CONSTRAINTS.md`, architecture ADRs, story stubs | `/story` |
+| Epic / project | `/epic` | `[epics-dir]/[epic-id]/epic.md` (requirements, story map, and `## Architecture` with contract ids `E1…`; or `SPEC.md` for a whole product), `CONSTRAINTS.md`, architecture ADRs, story stubs | `/story` |
 | Story | `/story` | `[stories-dir]/[story-id]/spec.md` with `## Design`, `plan.md`, task notes | `/task` or `/build auto` |
 | Task / subtask | `/task` | One task note's `## Design`, `## Checklist`, `## Log`, and that task's code | The next task |
 
@@ -55,7 +55,7 @@ Decide the scope from these signals, in this order. A tracker's issue type, when
 |---|---|---|---|
 | Repo state | No `SPEC.md` or epic for this area yet | No story folder yet, or its phase is `spec`, `design`, or `plan` | A story with a plan exists, or the change needs no plan |
 | Request shape | A product, a new system, several capabilities | One user-facing capability or feature | One change: a function, an endpoint, a fix, a config |
-| Size | Capabilities that could ship separately | Several tasks, or tasks that share a contract (API, table, status field, event) | One focused session, touches no shared contract |
+| Size | Capabilities that could ship separately | Several tasks, or tasks that share a contract (API, table, status field, event) | One focused session, changes no shared contract |
 | Unknowns | Users, goals, or scope are unclear | Requirements are clear, design isn't | Requirements and design are clear |
 
 If the signals point to a different scope from the command that was run, say so in one or two sentences with the evidence, recommend the right command, and continue only when the user confirms. A bug report belongs at task scope unless the fix changes a shared contract.
@@ -64,16 +64,20 @@ If the signals point to a different scope from the command that was run, say so 
 
 ### Phase
 
-`work-state.sh phase [story-id]` reports where a story stands, so rerunning a command resumes instead of redoing work:
+`work-state.sh phase [story-id]` reports where a story stands, so rerunning a command resumes instead of redoing work. A phase ends when its gate records `approve-phase` (`approval-gate.md`, "Record it"), and it holds only while the approved artifact is unchanged:
 
 | Phase | Meaning | Next step |
 |---|---|---|
 | `none` | No story folder | Write the spec |
-| `spec` | Folder without `spec.md` | Write the spec |
-| `design` | Spec without a `## Design` section, and no plan yet | High-level design. A story that already has a plan is past this phase: small stories may skip it. |
-| `plan` | No `plan.md`, or no task notes | Plan the tasks |
-| `build` | Some task isn't complete (`open_tasks=N`) | `/task` or `/build auto` |
-| `done` | Every task is complete (`done` or `cancelled`) | Review the story as a whole, then ship |
+| `spec` | No `spec.md`, or its approval is missing or stale (the spec, outside `## Design`, changed since) | Write or revise the spec, pass its gate, `approve-phase [story-id] spec` |
+| `design` | Spec approved; neither the design nor the plan is approved (missing or stale) | High-level design, its gate, `approve-phase [story-id] design`. A story that needs no design records the skip with the same command and no `## Design` written. |
+| `plan` | Plan not approved: no `plan.md` or task notes yet, or either changed since approval | Plan the tasks, pass the gate, `approve-phase [story-id] plan` |
+| `build` | Plan approved, some task isn't complete (`open_tasks=N`; a task in `review` is still open) | `/task` or `/build auto` |
+| `done` | Plan approved, every task is complete (`done` or `cancelled`) | Review the story as a whole, then ship |
+
+An approved plan keeps a story in `build` when the design is edited later: its tasks re-gate on the contracts they cite instead. Editing the spec or the plan, or adding a task note, voids that approval and returns the story to `spec` or `plan` until its gate runs again (see Re-planning and Splitting).
+
+For a planned story (a spec, a plan, and task notes) that predates recorded approvals, `phase` reports `spec` and also prints `approvals=missing run: work-state.sh adopt-approvals [story-id]`. It never approves by itself: run that command once, after the user confirms the story's earlier gates passed (`approval-gate.md`).
 
 ## Layout
 
@@ -82,12 +86,12 @@ The layout is the same in both stores:
 ```
 [epics-dir]/[epic-id]/
   [epic-id].md        Project note, created by `init-epic` (dotpm shows it as a project)
-  epic.md             Product requirements and the story map: ordered stories with rough acceptance criteria
+  epic.md             Product requirements, the story map (ordered stories with rough acceptance criteria), and `## Architecture` (contract ids `E1…`)
   summary.md
 
 [stories-dir]/[story-id]/
-  [story-id].md       Project note, created by `init-story`; its `parent` links the epic
-  spec.md             Requirements with FR/NFR ids, plus `## Design` from high-level-design
+  [story-id].md       Project note, created by `init-story`; its `parent` links the epic; its frontmatter holds the phase approvals
+  spec.md             Requirements with FR/NFR ids, plus `## Design` from high-level-design (contract ids `C1…`)
   plan.md             Task index: ids, titles, order, dependencies, design refs. Never status.
   summary.md
   _tasks/
@@ -96,7 +100,8 @@ The layout is the same in both stores:
 
 - **`story-id`** — kebab-case, chosen once and never renamed. Use the tracker key when one exists (`pac2-8120`), otherwise a short slug (`shipment-tracking`).
 - **`task-id`** — the file name of the task note: the slug of its title. Titles start with the plan number (`T02 Apply event`), so ids read `t01`, `t02`, … in plan order plus a slug: `t02-apply-event`. `new-task` derives the id from the title, which it stores without punctuation so that dotpm keeps the id (see Obsidian (dotpm) Compatibility). Ids are never reused or renumbered after the plan is approved; a task added later takes the next free number.
-- **Project notes** (`[story-id].md`, `[epic-id].md`) hold no content. The Obsidian plugin rewrites their body whenever it saves them, so requirements, designs and plans stay in `epic.md`, `spec.md` and `plan.md`.
+- **Project notes** (`[story-id].md`, `[epic-id].md`) hold no content. The Obsidian plugin rewrites their body whenever it saves them, so requirements, designs and plans stay in `epic.md`, `spec.md` and `plan.md`. A story's project note keeps its phase approvals (`spec_approved`, `design_approved`, `plan_approved`) in its frontmatter.
+- **Contract ids** — a story's shared contracts carry ids `C1…` in its `## Design`. An epic's architecture lives in `epic.md` under `## Architecture`, with ids `E1…` for what several stories share. A task cites either in `design_refs` (`C1, E2`); `brief` and the task's approval read an `E` id from the epic that the story project note's `parent` links.
 - **Epics** are optional. A story belongs to an epic when its project note's `parent` links it, set by `init-story [story-id] "[title]" [epic-id]`.
 - A project-level spec (the whole product, or a capability map with module specs) stays at `SPEC.md` in the project root. Stories reference it; they don't copy it.
 - If the project designates another spec location or an external spec tool, that location replaces `[stories-dir]`; the one-note-per-task rule still applies.
@@ -107,7 +112,7 @@ The layout is the same in both stores:
 |---|---|---|---|
 | `spec.md` | `spec-driven-development`, `high-level-design` | Before approval, or when a design change is escalated | Read-only while tasks are being built |
 | `plan.md` | `planning-and-task-breakdown` | Before approval, or on a re-plan | Read-only while tasks are being built. Task status is **never** recorded here. |
-| `[story-id].md`, `[epic-id].md` | `work-state.sh` (`init-story`, `init-epic`, `new-task`, `set`) | Planning, then status changes | Scripted only. Never edited by hand. |
+| `[story-id].md`, `[epic-id].md` | `work-state.sh` (`init-story`, `init-epic`, `new-task`, `set`, `approve-phase`, `adopt-approvals`) | Planning, gates, then status changes | Scripted only. Never edited by hand. |
 | `_tasks/[task-id].md` | The session that claimed the task | While building | Exactly one writer: the claim owner |
 
 No hand-maintained checklist exists. Progress is read from the task notes' `status` fields.
@@ -162,14 +167,23 @@ customFields:
 Project: [[shipment-tracking|Shipment tracking]]
 ```
 
-- **Status:** `todo | in-progress | blocked | review | done | cancelled`. A task is **complete** when it is `done` or `cancelled`. `review` means finished and waiting for review; it is not complete. `completed: YYYY-MM-DD` appears only on complete tasks.
+- **Status:** `todo | in-progress | blocked | review | done | cancelled`. A task is **complete** when it is `done` or `cancelled`. `review` means built and waiting for review; it is not complete, so `next` and `phase` treat the task as open and its dependents keep waiting. The builder sets `review` when the acceptance criteria pass, and the orchestrator sets `done` after the review passes (see Finishing). `completed: YYYY-MM-DD` appears only on complete tasks.
 - **`dependencies`** lists the task ids this task waits for; `next` starts a task only when all of them are complete.
-- **`customFields`** holds the agent-only data: `design_refs` (shared contract ids from the design, e.g. `C3, C4`), `branch` (the claim's work branch), and `design_approved` (written by `approve`; the fingerprint covers `## Design` only).
+- **`customFields`** holds the agent-only data: `design_refs` (the shared contract ids the task cites: `C3, C4` from the story's design, `E1` from its epic's `## Architecture`), `branch` (the claim's work branch), and `design_approved` (written by `approve`; the fingerprint covers the description above `## Design`, the `## Design` section, `design_refs`, and the blocks that define each cited contract, so editing any of them voids the approval; `work-state.sh cites [story-id] [contract-id]` lists the tasks that cite a contract).
 - **`title`** is the single source of the file name, so never edit it by hand.
 - **`## Checklist`** is an optional list the owner ticks while building (`- [ ] adapter`, `- [x] schema`); `progress` follows the ticked share. **`## Log`** holds one line per meaningful step or decision, the user's answers at an `ask` included: `- YYYY-MM-DD what changed or was decided, what's next`. Add lines with `work-state.sh log`, and always one before stopping for any reason, so the next session can pick up from it. This is the one logging rule; commands and agents follow it.
 - The trailing `Project: [[…]]` line belongs to the Obsidian plugin; keep it.
 
-`planning-and-task-breakdown` creates every task note with `new-task` when the plan is written, and inserts the Step 4 structure as the body above `## Design`. `low-level-design` fills `## Design`. The builder moves state with `claim`, `log`, and `set`, ticks `## Checklist`, and logs as above.
+`planning-and-task-breakdown` creates every task note with `new-task` when the plan is written, and inserts the Step 4 structure as the body above `## Design`. `low-level-design` fills `## Design`. The builder moves state with `claim`, `log`, and `set` (up to `review`), ticks `## Checklist`, and logs as above.
+
+## Re-planning and Splitting
+
+A plan changes after approval: a task turns out too big, or work appears that nobody planned. Task ids are never reused and the plan is never changed behind the user's back, so the change goes through the plan gate again:
+
+1. **Retire the old task.** For a task that has to be split or dropped (never one another session has claimed: its owner, or `/resume`, closes the claim first), run `work-state.sh set [story-id] [task-id] cancelled`, then `work-state.sh log [story-id] [task-id] "split into t07-…, t08-…: [reason]"`. The note stays, so the id is never reused, and a cancelled task is complete, so it blocks nothing.
+2. **Add the new tasks.** `work-state.sh new-task [story-id] "T07 [title]" [dependency-task-id…]`, with the next free T number (one past the highest in the story, cancelled tasks included), then `work-state.sh field … design_refs` and the description above `## Design`, as when the plan was written. A task that depended on the retired one now counts it complete and could start early. If it must wait for the replacements, retire it the same way and recreate it with the replacements as its dependencies.
+3. **Update the plan.** Edit `plan.md` in place: the new rows in order, and `split into t07, t08` (or nothing, when dropped) on the old row.
+4. **Run the plan gate again.** A new task note changes the plan's fingerprint, so `phase` is `plan` until the gate passes: catch-up summary (what was split and why), `grill-me` rounds over what is still open, the user's go-ahead, then `work-state.sh approve-phase [story-id] plan`. Each new task still passes its own design gate before it is built. In the repo store, commit `plan.md`, the new task notes, and the story's project note so every worktree sees them before anyone claims a new task.
 
 ## Claim Protocol
 
@@ -190,7 +204,7 @@ Before picking, bring the base branch up to date (`git pull --ff-only`) so tasks
 - `claim` has already set `in-progress` and the branch, unless it printed a `set … in-progress` command for a worktree that didn't exist yet: run that from the worktree. Don't set them again. Tick `## Checklist` and log by the `## Log` rule above.
 - Where the store is the repo, a claimed task's note is read and written in the work branch's worktree first (it's the freshest copy). The vault store has a single copy, shared by every worktree.
 
-**Finishing:** run `work-state.sh set [story-id] [task-id] done`, then commit the task's code (repo store: with the task note; vault store: the note isn't in git, so there's nothing more to commit for it). Release the lock once the work is on the base branch, which is where `next` looks:
+**Finishing:** the builder runs `work-state.sh set [story-id] [task-id] review` when the acceptance criteria pass, then commits the task's code (repo store: with the task note; vault store: the note isn't in git, so there's nothing more to commit for it). `review` is not completion: `next` and `phase` still count the task as open and its dependents keep waiting. The orchestrator (or you, without subagents) reviews the diff against the approved design note. Critical or Important findings go back to a builder and the task returns to `in-progress` (`work-state.sh set … in-progress`) until it is in `review` again. When the review passes, run `work-state.sh set [story-id] [task-id] done`; in the repo store, commit the task note (`git commit -- <task note>`) so `done` travels with the work branch. Release the lock once the work is on the base branch, which is where `next` looks:
 - *Committed on the base branch* (same checkout, no separate branch): release right after the commit.
 - *Committed on a work branch* (a worktree, or a branch in the same checkout): release after that branch is merged into the base branch. A lock released earlier lets another session take the task again. Until then, `status` shows the task as done but "not yet merged", and `next` doesn't treat it as a finished dependency.
 
@@ -253,12 +267,14 @@ The notes follow the format of the Obsidian project-manager plugin ("dotpm"), so
 - **Title ↔ file name.** dotpm names a task note from its title (lowercase; `\ / : * ? " < > |` and whitespace become `-`; at most 60 characters). When a saved task's title no longer gives its file's name, dotpm creates a note under its own name and trashes the old one, which silently changes the task id. So `new-task` stores the title as letters and digits separated by single spaces (accents are transliterated first when `iconv` is available) and cuts it at 60 characters: `T04 Fix: a/b, (x)` is stored as `T04 Fix a b x`, which dotpm names `t04-fix-a-b-x`, the task id. Ids use only `a-z`, `0-9`, and single dashes, so herdr web links their paths. Never edit a `title` by hand.
 - **Statuses.** `todo`, `in-progress`, `blocked`, `review`, `done`, `cancelled`; complete means `done` or `cancelled`.
 - **No git history in a vault.** A vault store's task notes aren't in the repository, so there is no merged-branch signal for them. `next` relies on released locks instead: a dependency counts only when it is complete and its claim is gone.
-- **Custom fields.** `design_refs`, `branch`, and `design_approved` live in `customFields`; the story's project note declares them so dotpm displays them.
+- **Custom fields.** `design_refs`, `branch`, and `design_approved` live in a task's `customFields`; the story's project note declares them so dotpm displays them. A story's phase approvals are plain top-level keys of its project note instead: there `customFields` is dotpm's list of field definitions, not a map, and dotpm keeps frontmatter keys it doesn't know.
 - **Links.** In the vault store every wikilink (`projectId`, `dependencies`, `parent`, `taskIds`, `## Tasks`, the footer) uses the note's vault path, such as `[[Projects/app/stories/shipment-tracking/_tasks/t01-webhook-route|T01 webhook route]]`, because ids like `t01-*` repeat across stories and repositories in one vault. The repo store uses bare names, as in the template above. `work-state.sh` writes every link; the task id is always the last path segment.
 
 ## External Trackers
 
 When the project designates an issue tracker, each task is a tracker item instead of a task note, and the claim is the tracker's assignment. Assigning the item to yourself replaces the claim steps, and the tracker's own status replaces `set` and `log`. `plan.md` keeps the ordered list of item ids or links.
+
+Approvals live in the tracker item too. `approve`, `approved`, and `approve-phase … plan` read task notes, so they can't be used for tracked tasks (and `phase` stays at `plan`, because it counts task notes). The gate still runs for every task. Record the user's go-ahead as a comment on the tracker item only when the user asked for tracker comments; otherwise record it in `plan.md`, as a line beside the task's row (`approved YYYY-MM-DD: [task-id] design`). Build only an item whose design is recorded that way, and run the gate again when the design changes. The story's spec and design gates are unaffected: its project note still holds `approve-phase [story-id] spec` and `design`.
 
 ## Legacy Layout
 

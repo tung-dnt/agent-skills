@@ -1,8 +1,10 @@
 #!/bin/bash
 # work-state-test.sh — Tests for hooks/work-state.sh: store resolution (vault
 # or repository), dotpm notes, claiming across sessions, worktrees, and
-# machines, the ticked status tree, migration from the old layout, and the
-# SessionStart hint. Every test builds throwaway git repositories and vaults.
+# machines, the ticked status tree, recorded approvals (a task's, and a story's
+# spec, design, and plan) with the story phase they drive, migration from the
+# old layout, and the SessionStart hint. Every test builds throwaway git
+# repositories and vaults.
 #
 # Run: bash hooks/work-state-test.sh
 
@@ -220,24 +222,35 @@ new_repo phase
 has "no story directory is phase none" "$(ws phase cart)" "phase=none"
 story cart 'Cart'
 has "no spec is phase spec" "$(ws phase cart)" "phase=spec"
+# What /epic leaves behind as a story stub is a spec nobody has approved.
 printf '# Spec\n- FR1: add item\n' > docs/stories/cart/spec.md
-has "spec without design is phase design" "$(ws phase cart)" "phase=design"
+has "a story stub with an unapproved spec is phase spec" "$(ws phase cart)" "phase=spec"
+ws approve-phase cart spec >/dev/null
+has "an approved spec without a design is phase design" "$(ws phase cart)" "phase=design"
 printf '\n## Design\nC1: cart API.\n' >> docs/stories/cart/spec.md
-has "design without plan is phase plan" "$(ws phase cart)" "phase=plan"
+has "a design that is still being written is phase design" "$(ws phase cart)" "phase=design"
+ws approve-phase cart design >/dev/null
+has "an approved design without a plan is phase plan" "$(ws phase cart)" "phase=plan"
 printf '# Plan\n' > docs/stories/cart/plan.md
-has "plan without task notes is still phase plan" "$(ws phase cart)" "phase=plan"
+has "a plan without task notes is still phase plan" "$(ws phase cart)" "phase=plan"
 task cart 'T01 add'
 task cart 'T02 remove'
 set_status cart t02-remove done
+has "a plan and tasks nobody approved are phase plan" "$(ws phase cart)" "phase=plan"
+ws approve-phase cart plan >/dev/null
 out=$(ws phase cart)
-has "open tasks are phase build" "$out" "phase=build"
+has "an approved plan with open tasks is phase build" "$out" "phase=build"
 has "phase build counts open tasks" "$out" "open_tasks=1"
+lacks "a story with recorded approvals gets no migration note" "$out" "approvals=missing"
 set_status cart t01-add cancelled
 has "done and cancelled tasks make phase done" "$(ws phase cart)" "phase=done"
 story tiny 'Tiny'
 printf '# Spec\n- FR1: one change\n' > docs/stories/tiny/spec.md && printf '# Plan\n' > docs/stories/tiny/plan.md
 task tiny 'T01 change'
-has "a planned story without a design section is phase build" "$(ws phase tiny)" "phase=build"
+ws approve-phase tiny spec >/dev/null
+has "an unapproved design stops a story whose plan is not approved either" "$(ws phase tiny)" "phase=design"
+ws approve-phase tiny plan >/dev/null
+has "an approved plan carries a story past an unapproved design" "$(ws phase tiny)" "phase=build"
 
 echo "design approval"
 new_repo approval
@@ -274,6 +287,251 @@ git worktree add --quiet -b feat-report "$TMP/wt-report"
 (cd "$TMP/wt-report" && "$BASH_BIN" "$SCRIPT" claim pay t02-report feat-report >/dev/null && "$BASH_BIN" "$SCRIPT" approve pay t02-report >/dev/null)
 has "approval made in the worktree is seen from the main checkout" "$(code approved pay t02-report)" "0"
 lacks "main checkout's copy was not touched" "$(cat "$(note pay t02-report)")" "design_approved"
+
+echo "phase approvals"
+new_repo gates
+story pay 'Payments'
+has "approve-phase needs the story's project note" "$(ws approve-phase nope spec)" "no project note for story 'nope'"
+has "approve-phase needs a known phase" "$(ws approve-phase pay build)" "usage: work-state.sh approve-phase STORY spec|design|plan"
+has "approved-phase needs a known phase" "$(ws approved-phase pay nope)" "usage: work-state.sh approved-phase STORY spec|design|plan"
+has "approving a spec needs a spec" "$(ws approve-phase pay spec)" "no spec.md for story pay"
+has "approving a plan needs a plan" "$(ws approve-phase pay plan)" "no plan.md for story pay"
+printf '# Spec\n- FR1: refund\n\n## Design\nC1: refund API.\n\n## Open questions\nNone.\n' > docs/stories/pay/spec.md
+printf '# Plan\n- t01-refund: refund\n' > docs/stories/pay/plan.md
+has "approving a plan needs task notes" "$(ws approve-phase pay plan)" "has no task notes"
+has "an unrecorded phase is not approved (exit 6)" "$(code approved-phase pay spec)" "6"
+has "approved-phase says what is missing" "$(ws approved-phase pay spec)" "not approved: pay has no approved spec"
+has "approve-phase records the spec" "$(ws approve-phase pay spec)" "approved: pay spec ("
+has "a recorded spec is approved (exit 0)" "$(code approved-phase pay spec)" "0"
+has "the approval is a frontmatter key of the story's project note" "$(sed -n '2,/^---$/p' docs/stories/pay/pay.md)" 'spec_approved: "'
+lacks "customFields keeps only dotpm's field definitions" "$(cat docs/stories/pay/pay.md)" "  spec_approved"
+sed -i.bak 's/FR1: refund/FR1: refund in full/' docs/stories/pay/spec.md && rm docs/stories/pay/spec.md.bak
+has "editing the spec voids its approval (exit 7)" "$(code approved-phase pay spec)" "7"
+has "approved-phase says the spec changed" "$(ws approved-phase pay spec)" "pay's spec changed after approval"
+has "and phase returns to spec" "$(ws phase pay)" "phase=spec"
+ws approve-phase pay spec >/dev/null
+has "re-approving restores it" "$(code approved-phase pay spec)" "0"
+has "re-approving keeps one approval line" "$(grep -c '^spec_approved:' docs/stories/pay/pay.md)" "1"
+printf '\n\n<!-- reviewed -->   \n' >> docs/stories/pay/spec.md
+has "blank lines and comments are not edits" "$(code approved-phase pay spec)" "0"
+sed -i.bak 's/C1: refund API\./C1: refund API v2./' docs/stories/pay/spec.md && rm docs/stories/pay/spec.md.bak
+has "editing the design keeps the spec approved" "$(code approved-phase pay spec)" "0"
+has "an unrecorded design is not approved (exit 6)" "$(code approved-phase pay design)" "6"
+out=$(ws approve-phase pay design)
+has "approve-phase records the design" "$out" "approved: pay design ("
+lacks "a written design is not recorded as skipped" "$out" "skipped"
+has "a recorded design is approved (exit 0)" "$(code approved-phase pay design)" "0"
+sed -i.bak 's/C1: refund API v2\./C1: refund API v3./' docs/stories/pay/spec.md && rm docs/stories/pay/spec.md.bak
+has "editing the design voids its approval (exit 7)" "$(code approved-phase pay design)" "7"
+has "with no approved plan, phase returns to design" "$(ws phase pay)" "phase=design"
+ws approve-phase pay design >/dev/null
+task pay 'T01 refund'
+has "an unrecorded plan is not approved (exit 6)" "$(code approved-phase pay plan)" "6"
+ws approve-phase pay plan >/dev/null
+has "a recorded plan is approved (exit 0)" "$(code approved-phase pay plan)" "0"
+has "with the spec, design, and plan recorded the story is in build" "$(ws phase pay)" "phase=build"
+task pay 'T02 report'
+has "adding a task note voids the plan approval (exit 7)" "$(code approved-phase pay plan)" "7"
+has "and phase returns to plan" "$(ws phase pay)" "phase=plan"
+ws approve-phase pay plan >/dev/null
+set_status pay t02-report cancelled
+has "cancelling a task keeps the plan approval" "$(code approved-phase pay plan)" "0"
+printf -- '- t02-report: report\n' >> docs/stories/pay/plan.md
+has "editing the plan voids its approval (exit 7)" "$(code approved-phase pay plan)" "7"
+ws approve-phase pay plan >/dev/null
+sed -i.bak 's/C1: refund API v3\./C1: refund API v4./' docs/stories/pay/spec.md && rm docs/stories/pay/spec.md.bak
+has "a design edited during build leaves the story in build" "$(ws phase pay)" "phase=build"
+sed -i.bak 's/FR1: refund in full/FR1: refund in full or in part/' docs/stories/pay/spec.md && rm docs/stories/pay/spec.md.bak
+has "a spec edited during build sends the story back to spec" "$(ws phase pay)" "phase=spec"
+
+echo "design skipped, and a design kept in design.md"
+story small 'Small'
+printf '# Spec\n- FR1: tweak\n' > docs/stories/small/spec.md
+ws approve-phase small spec >/dev/null
+has "a story with no design records its skip" "$(ws approve-phase small design)" "approved: small design as skipped, none written"
+has "a recorded skip is approved (exit 0)" "$(code approved-phase small design)" "0"
+has "approved-phase says it was skipped" "$(ws approved-phase small design)" "(skipped, "
+printf '# Plan\n' > docs/stories/small/plan.md
+task small 'T01 tweak'
+has "a recorded skip carries the story to plan" "$(ws phase small)" "phase=plan"
+printf '\n## Design\nC1: a contract nobody planned for.\n' >> docs/stories/small/spec.md
+has "a design written after the skip voids it (exit 7)" "$(code approved-phase small design)" "7"
+has "and the story returns to design" "$(ws phase small)" "phase=design"
+story long 'Long'
+printf '# Spec\n- FR1: big\n' > docs/stories/long/spec.md
+printf '# Design\nC1: kept in a sibling file.\n' > docs/stories/long/design.md
+ws approve-phase long spec >/dev/null
+lacks "a sibling design.md counts as the design" "$(ws approve-phase long design)" "skipped"
+printf 'C2: another.\n' >> docs/stories/long/design.md
+has "editing design.md voids the design approval (exit 7)" "$(code approved-phase long design)" "7"
+task long 'T01 use it'
+after_heading "$(note long t01-use-it)" Design '- Edge: use()'
+ws field long t01-use-it design_refs "C1" >/dev/null
+ws approve long t01-use-it >/dev/null
+has "brief reads a cited contract from design.md" "$(ws brief long t01-use-it)" "C1: kept in a sibling file."
+sed -i.bak 's/kept in a sibling file/kept elsewhere/' docs/stories/long/design.md && rm docs/stories/long/design.md.bak
+has "editing a contract in design.md voids a task approval (exit 7)" "$(code approved long t01-use-it)" "7"
+
+echo "task approval covers the description and the cited contracts"
+new_repo contracts
+ws init-epic payments 'Payments' >/dev/null
+story pay 'Payments' payments
+printf '# Epic: Payments\n\n## Architecture\n\nE1 event bus: at-least-once, ordered per account.\n\nE2 auth: bearer tokens.\n\n## Story map\n\nThe pay story publishes on E1.\n' > docs/epics/payments/epic.md
+printf '# Spec\n- FR1: refund\n\n## Design\n\n### Shared contracts\n\nC1 refund API: POST /refunds.\n\nC2 status lifecycle: NEW to DONE.\n' > docs/stories/pay/spec.md
+task pay 'T01 refund'
+task pay 'T02 report'
+task pay 'T03 docs'
+f=$(note pay t01-refund)
+describe "$f" "$(printf 'Refunds a payment.\n\n**Acceptance criteria:**\n- [ ] refund stored\n  - [ ] nested detail')"
+after_heading "$f" Design '- Edge: refund(paymentId)'
+ws field pay t01-refund design_refs "C1, E1" >/dev/null
+ws approve pay t01-refund >/dev/null
+has "a design approval covers its task" "$(code approved pay t01-refund)" "0"
+out=$(ws brief pay t01-refund)
+has "brief shows a cited story contract" "$out" "C1 refund API: POST /refunds."
+has "brief resolves an E-id from the parent epic" "$out" "== design E1 (from epic.md)"
+has "and shows its text" "$out" "E1 event bus: at-least-once"
+lacks "brief omits an epic contract the task does not cite" "$out" "E2 auth"
+sed -i.bak 's/Refunds a payment\./Refunds a payment in full./' "$f" && rm "$f.bak"
+has "editing the description voids the approval (exit 7)" "$(code approved pay t01-refund)" "7"
+has "status flags it" "$(ws status pay)" "t01-refund · design ✗ (changed since approval)"
+ws approve pay t01-refund >/dev/null
+sed -i.bak 's/- \[ \] refund stored/- [x] refund stored/' "$f" && rm "$f.bak"
+has "ticking an acceptance criterion keeps the approval" "$(code approved pay t01-refund)" "0"
+sed -i.bak 's/  - \[ \] nested detail/  - [x] nested detail/' "$f" && rm "$f.bak"
+has "ticking an indented criterion keeps the approval" "$(code approved pay t01-refund)" "0"
+sed -i.bak 's#POST /refunds#POST /v2/refunds#' docs/stories/pay/spec.md && rm docs/stories/pay/spec.md.bak
+has "editing a cited story contract voids the approval (exit 7)" "$(code approved pay t01-refund)" "7"
+ws approve pay t01-refund >/dev/null
+sed -i.bak 's/NEW to DONE/NEW to PAID/' docs/stories/pay/spec.md && rm docs/stories/pay/spec.md.bak
+has "editing a contract the task does not cite keeps it" "$(code approved pay t01-refund)" "0"
+sed -i.bak 's/ordered per account/ordered globally/' docs/epics/payments/epic.md && rm docs/epics/payments/epic.md.bak
+has "editing a cited epic contract voids the approval (exit 7)" "$(code approved pay t01-refund)" "7"
+ws approve pay t01-refund >/dev/null
+sed -i.bak 's/bearer tokens/mutual TLS/; s/publishes on E1/publishes events/' docs/epics/payments/epic.md && rm docs/epics/payments/epic.md.bak
+has "editing an uncited epic contract, or the epic outside its architecture, keeps it" "$(code approved pay t01-refund)" "0"
+ws field pay t01-refund design_refs "C1" >/dev/null
+has "changing the cited ids voids the approval (exit 7)" "$(code approved pay t01-refund)" "7"
+
+echo "cites"
+ws field pay t01-refund design_refs "C1, E1" >/dev/null
+ws field pay t02-report design_refs "C1, C2" >/dev/null
+is "cites lists every task that cites a contract, with its status" "$(ws cites pay C1)" "t01-refund todo
+t02-report todo"
+is "cites lists one task for a contract it alone cites" "$(ws cites pay C2)" "t02-report todo"
+set_status pay t02-report done
+is "cites shows which citing tasks are already done" "$(ws cites pay C2)" "t02-report done"
+is "cites finds an epic contract" "$(ws cites pay E1)" "t01-refund todo"
+is "cites matches whole ids only" "$(ws cites pay C)" ""
+is "cites says nothing for an id nobody cites" "$(ws cites pay C9)" ""
+has "cites needs a known story" "$(ws cites nope C1)" "no story 'nope'"
+has "cites needs an id" "$(ws cites pay)" "usage: work-state.sh cites STORY ID"
+
+echo "contracts written under headings"
+new_repo headings
+story pay 'Payments'
+printf '# Spec\n- FR1: refund\n\n## Design\n\n### Shared contracts\n\n#### C1 refund API\n\nPOST /refunds with a body.\n\n```json\n{ "amount": 5 }\n\n{ "note": "x" }\n```\n\n#### C2 status lifecycle\n\nNEW to DONE.\n' > docs/stories/pay/spec.md
+task pay 'T01 refund'
+f=$(note pay t01-refund)
+after_heading "$f" Design '- Edge: refund()'
+ws field pay t01-refund design_refs "C1" >/dev/null
+ws approve pay t01-refund >/dev/null
+out=$(ws brief pay t01-refund)
+has "brief shows the whole section under the heading that names a contract" "$out" "POST /refunds with a body."
+has "including a fenced example split by a blank line" "$out" '{ "note": "x" }'
+lacks "but not the next contract's section" "$out" "NEW to DONE"
+sed -i.bak 's#POST /refunds with a body#DELETE /refunds with a body#' docs/stories/pay/spec.md && rm docs/stories/pay/spec.md.bak
+has "editing a contract's body voids the approval (exit 7)" "$(code approved pay t01-refund)" "7"
+ws approve pay t01-refund >/dev/null
+sed -i.bak 's/"note": "x"/"note": "y"/' docs/stories/pay/spec.md && rm docs/stories/pay/spec.md.bak
+has "editing its fenced example voids the approval (exit 7)" "$(code approved pay t01-refund)" "7"
+ws approve pay t01-refund >/dev/null
+sed -i.bak 's/NEW to DONE/NEW to PAID/' docs/stories/pay/spec.md && rm docs/stories/pay/spec.md.bak
+has "editing the next contract's section keeps it" "$(code approved pay t01-refund)" "0"
+
+echo "approvals do not depend on the locale"
+new_repo locale
+story s 'S'
+printf '# Spec\n- FR1: x\n\n## Design\n\nC2 beta: b.\n\nc1 alpha: a.\n' > docs/stories/s/spec.md
+printf '# Plan\n' > docs/stories/s/plan.md
+task s 'T1 b'
+task s 'T10 a'
+after_heading "$(note s t1-b)" Design '- Edge: b()'
+ws field s t1-b design_refs "c1, C2" >/dev/null
+(export LC_ALL=C; ws approve-phase s plan >/dev/null; ws approve s t1-b >/dev/null)
+for loc in en_US.UTF-8 en_GB.UTF-8; do
+  has "a plan approved under the C locale holds under $loc" "$(export LC_ALL=$loc; code approved-phase s plan)" "0"
+  has "so does a task approval over mixed-case contract ids ($loc)" "$(export LC_ALL=$loc; code approved s t1-b)" "0"
+done
+
+echo "review status"
+new_repo review
+story pay 'Payments'
+printf '# Spec\n- FR1: x\n' > docs/stories/pay/spec.md
+printf '# Plan\n' > docs/stories/pay/plan.md
+task pay 'T01 first'
+task pay 'T02 second' t01-first
+ws approve-phase pay spec >/dev/null
+ws approve-phase pay design >/dev/null
+ws approve-phase pay plan >/dev/null
+set_status pay t01-first review
+lacks "review records no completion date" "$(cat "$(note pay t01-first)")" "completed:"
+lacks "review is not full progress" "$(cat "$(note pay t01-first)")" "progress: 100"
+has "a task in review keeps the story in build" "$(ws phase pay)" "open_tasks=2"
+lacks "a task waiting on one in review is not offered" "$(ws next pay)" "pay/t02-second"
+set_status pay t01-first in-progress
+has "findings send a task back to in progress" "$(cat "$(note pay t01-first)")" "status: in-progress"
+set_status pay t01-first review
+set_status pay t01-first done
+has "done after review completes the task" "$(cat "$(note pay t01-first)")" "completed: $(date +%Y-%m-%d)"
+has "and unlocks its dependent" "$(ws next pay)" "pay/t02-second"
+has "phase counts it as complete" "$(ws phase pay)" "open_tasks=1"
+
+echo "adopting approvals for planned stories that predate them"
+new_repo adopt
+story old 'Old'
+printf '# Spec\n- FR1: x\n\n## Design\n\nC1: api.\n' > docs/stories/old/spec.md
+printf '# Plan\n' > docs/stories/old/plan.md
+task old 'T01 first'
+task old 'T02 second'
+task old 'T03 third'
+describe "$(note old t01-first)" 'Does the first thing.'
+after_heading "$(note old t01-first)" Design '- Edge: first()'
+after_heading "$(note old t02-second)" Design '- Edge: second()'
+# Approvals recorded before descriptions and contracts were covered fingerprint the design alone.
+old_hash() { printf -- '%s\n' "$1" | git hash-object --stdin | cut -c1-12; }
+ws field old t01-first design_approved "2026-10-01T10:00Z $(old_hash '- Edge: first()')" >/dev/null
+ws field old t02-second design_approved "2026-10-01T10:00Z $(old_hash '- Edge: second()')" >/dev/null
+after_heading "$(note old t02-second)" Design '- Edge: edited after its approval'
+set_status old t01-first in-progress
+out=$(ws phase old)
+has "a planned story with no recorded approvals is not past spec" "$out" "phase=spec"
+has "phase points at adopt-approvals" "$out" "approvals=missing run: work-state.sh adopt-approvals old"
+has "the hint says to ask the user first" "$out" "only if the user confirms its earlier gates passed"
+has "a task approved under the earlier fingerprint reads as changed (exit 7)" "$(code approved old t01-first)" "7"
+out=$(ws adopt-approvals old)
+has "adopt records the spec" "$out" "approved: old spec ("
+has "adopt records the design" "$out" "approved: old design ("
+has "adopt records the plan" "$out" "approved: old plan ("
+has "adopt re-records a task approval whose design is unchanged" "$out" "approved: old/t01-first (re-recorded"
+lacks "adopt leaves a task whose design changed since its approval alone" "$out" "old/t02-second"
+has "the re-recorded approval holds (exit 0)" "$(code approved old t01-first)" "0"
+has "the edited design stays changed (exit 7)" "$(code approved old t02-second)" "7"
+out=$(ws phase old)
+has "the adopted story is in build" "$out" "phase=build"
+lacks "and no longer gets the note" "$out" "approvals=missing"
+has "adopt is one-shot" "$(ws adopt-approvals old)" "with no recorded approvals"
+story calm 'Calm'
+printf '# Spec\n- FR1: y\n' > docs/stories/calm/spec.md
+printf '# Plan\n' > docs/stories/calm/plan.md
+task calm 'T01 only'
+has "a planned story whose tasks haven't started gets the note too" "$(ws phase calm)" "approvals=missing run: work-state.sh adopt-approvals calm"
+has "adopt records a story with no design as skipped" "$(ws adopt-approvals calm)" "approved: calm design as skipped, none written"
+has "and that story is in build" "$(ws phase calm)" "phase=build"
+story young 'Young'
+printf '# Spec\n- FR1: z\n' > docs/stories/young/spec.md
+has "adopt refuses a story that isn't planned" "$(ws adopt-approvals young)" "is for a planned story"
+lacks "phase gives an unplanned story no note" "$(ws phase young)" "approvals=missing"
 
 echo "worktrees"
 new_repo wt
@@ -454,6 +712,21 @@ has "reopening unticks it" "$(cat "$V/PM/app/stories/shop/shop.md")" "- [ ] [[PM
 git checkout --quiet -b feat-b && ws claim shop t02-pay feat-b >/dev/null
 has "hint works with the vault store" "$(ws hint)" "with this checkout (feat-b) as their work branch: shop/t02-pay"
 has "status reads the vault" "$(ws status shop)" "[~] t02-pay claimed: claim/shop/t02-pay"
+printf '# Spec\n- FR1: cart\n' > "$V/PM/app/stories/shop/spec.md"
+ws approve-phase shop spec >/dev/null
+has "phase approvals are recorded in the vault's project note" "$(cat "$V/PM/app/stories/shop/shop.md")" 'spec_approved: "'
+has "phase reads them from the vault" "$(ws phase shop)" "phase=design"
+ws init-epic payments 'Payments' >/dev/null
+story ride 'Ride' payments
+printf '# Spec\n- FR1: ride\n' > "$V/PM/app/stories/ride/spec.md"
+printf '# Epic\n\n## Architecture\n\nE1 event bus: ordered.\n' > "$V/PM/app/epics/payments/epic.md"
+task ride 'T01 go'
+after_heading "$V/PM/app/stories/ride/_tasks/t01-go.md" Design '- Edge: go()'
+ws field ride t01-go design_refs "E1" >/dev/null
+ws approve ride t01-go >/dev/null
+has "an epic contract is read through the vault's parent link" "$(ws brief ride t01-go)" "E1 event bus: ordered."
+sed -i.bak 's/ordered/unordered/' "$V/PM/app/epics/payments/epic.md" && rm "$V/PM/app/epics/payments/epic.md.bak"
+has "editing it voids the task approval in the vault store (exit 7)" "$(code approved ride t01-go)" "7"
 
 echo "migrate (repository store)"
 no_vault

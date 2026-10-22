@@ -84,13 +84,29 @@ Run the `grill-me` skill over the open decisions: rounds of numbered questions w
 
 Continue only on an explicit go-ahead. A hedged reply ("looks fine I guess") is not a go-ahead: ask what's holding them back. When an answer changes the artifact, update it and the summary, then run the gate again.
 
-**Record it.** At a task gate, record the go-ahead with `work-state.sh approve [story-id] [task-id]`. It stores `design_approved: <date> <fingerprint>` in the task note's `customFields`. `work-state.sh approved [story-id] [task-id]` exits 0 only while that approval exists and the `## Design` section is unchanged. Editing the note after approval voids it, and the gate runs again.
+**Record it.** Every gate records its go-ahead where a script can check it, so a later step reads the record instead of trusting the conversation. Record only after the explicit go-ahead, never to make a phase advance:
+
+| Gate | Record | Check |
+|---|---|---|
+| A task's design | `work-state.sh approve [story-id] [task-id]` | `approved [story-id] [task-id]` |
+| A story's spec, design, or plan | `work-state.sh approve-phase [story-id] spec\|design\|plan` | `approved-phase [story-id] <phase>`, and `phase` |
+| An epic | Nothing to run: the `summary.md` saved at the gate. Its story stubs stay unapproved, at phase `spec`, until `/story` gates each spec. | — |
+
+Each record is `<date> <fingerprint>`: a task's is `design_approved` in its note's `customFields`; a story phase's is `spec_approved`, `design_approved`, or `plan_approved` in the story project note's frontmatter. The fingerprint covers what was approved:
+
+- **A task:** the description above `## Design` (ticking a checkbox doesn't count as an edit), the `## Design` section, `design_refs`, and each cited contract as its spec defines it: the whole section under the heading that names its id (`#### C1 Refund API`), else the paragraphs that mention it; for an `E` id, the same in the epic's `## Architecture`. Changing a contract voids the approval of every task that cites it: `work-state.sh cites [story-id] [contract-id]` lists them, and each one runs its gate again.
+- **A story's spec:** the spec without its `## Design` section. **Its design:** that section, or `design.md` when the design lives there. **Its plan:** the plan plus the sorted ids of the task notes, so adding a task voids it.
+
+`approved` and `approved-phase` exit 0 only while the stored fingerprint still matches; they exit 6 when nothing is recorded and 7 when the artifact changed since. Editing an approved artifact voids its approval, and the gate runs again. `phase` advances only on a recorded approval that still matches. A story that needs no design records the skip: after the user agrees (a decision brief), `approve-phase [story-id] design` with no `## Design` written.
+
+Tasks kept in an external tracker have no task note, so `approve` and `approved` don't apply to them: see External Trackers in `work-artifacts.md`.
 
 ## Rules That Can't Be Skipped
 
-- **Nothing is built on an unapproved design.** Before any build, the orchestrator runs `work-state.sh approved`. The `task-builder` checks it again, and reports `blocked` on a non-zero exit.
+- **Nothing is built on an unapproved design.** Before any build, the orchestrator checks that `work-state.sh phase` reports `build` and runs `work-state.sh approved`. The `task-builder` checks `approved` again, and reports `blocked` on a non-zero exit.
 - **Existing work gets a gate too.** If code or commits already exist for a task that isn't approved (built in an earlier session, by hand, or before these rules), don't continue straight to review, push, PR, merge, or a tracker comment. First write the design note describing what was built and what should change, then run the gate on it, with the approach question if another approach was possible.
-- **"Don't stop" means batch, not skip.** When the user says "just build it", "don't stop", or "no questions", don't drop the design. Switch to batch mode instead: skip the step checkpoints, draft every missing note in one pass (subagents may draft), run one gate over all of them (a combined summary plus every note), `approve` each task, then build without further stops. `/build auto` works this way.
+- **"Don't stop" means batch, not skip.** When the user says "just build it", "don't stop", or "no questions", don't drop the design. Switch to batch mode instead: skip the step checkpoints, draft every missing note in one pass (subagents may draft), run one gate over all of them (a combined summary plus every note), record `approve-phase [story-id] plan` and `approve` each task, then build without further stops. `/build auto` works this way.
+- **Stories from before approvals were recorded.** For a planned story (a spec, a plan, and task notes) with no recorded approval, `phase` prints `approvals=missing run: work-state.sh adopt-approvals [story-id]` and reports `spec`. It means the earlier gates ran without leaving a record. Ask the user whether those gates passed. Only on a yes, run the command once: it records the spec, design, and plan as they are now, and re-records every task approval whose design is unchanged. Never run it to get past a gate that didn't happen.
 
 ## Subagents Can't Hold a Gate
 

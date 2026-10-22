@@ -27,6 +27,11 @@
 #   work-state.sh phase STORY                 none | spec | design | plan | build | done
 #   work-state.sh approve STORY TASK          record the gate's approval of the task's design
 #   work-state.sh approved STORY TASK         exit 0 approved, 6 not approved, 7 changed since
+#   work-state.sh approve-phase STORY PHASE   record the gate's approval of the spec, design, or plan
+#   work-state.sh approved-phase STORY PHASE  exit 0 approved, 6 not approved, 7 changed since
+#   work-state.sh adopt-approvals STORY       record approvals for a planned story that
+#                                             predates them (the user's call)
+#   work-state.sh cites STORY ID              tasks whose design_refs include ID (C1, E2, ...)
 #   work-state.sh migrate [STORY-ID]          convert the old tasks/*.md layout into the store
 #   work-state.sh hint                        SessionStart JSON when claims exist; silent otherwise
 #
@@ -259,6 +264,13 @@ section() {
     /^## / { l = $0; sub(/[[:space:]]+$/, "", l); on = (l == h); next }
     /^(Project|Parent): \[\[/ { on = 0 }
     on { print }'
+}
+
+# Markdown on stdin without section "## NAME": its heading and its lines.
+without_section() {
+  awk -v h="## $1" '
+    /^## / { l = $0; sub(/[[:space:]]+$/, "", l); on = (l == h) }
+    !on { print }'
 }
 
 checklist() {
@@ -515,6 +527,12 @@ need_task() {
   [ -f "$STORIES/$1/_tasks/$2.md" ] || die "no task note $STORIES/$1/_tasks/$2.md"
 }
 
+need_story() {
+  valid_id "$1" || die "usage: work-state.sh $2 STORY${3:+ $3}"
+  resolve
+  [ -f "$STORIES/$1/$1.md" ] || die "no project note for story '$1'; run work-state.sh init-story first"
+}
+
 # Status, progress, completed date, and updatedAt in one go. In progress under
 # a claim also records the claim's work branch. The vault store also ticks the
 # task in its project note.
@@ -683,10 +701,9 @@ write_task() {
 
 cmd_new_task() {
   local story="$1" given="$2" title id file dep deps=""
-  valid_id "$story" && [ -n "$given" ] || die "usage: work-state.sh new-task STORY TITLE [DEP-ID...]"
+  [ -n "$given" ] || die "usage: work-state.sh new-task STORY TITLE [DEP-ID...]"
+  need_story "$story" new-task "TITLE [DEP-ID...]"
   shift 2
-  resolve
-  [ -f "$STORIES/$story/$story.md" ] || die "no project note for story '$story'; run work-state.sh init-story first"
   title="$(task_title "$given")"
   id="$(slug "$title")"
   valid_id "$id" || die "title '$given' gives no usable task id"
@@ -740,19 +757,55 @@ cmd_log() {
   echo "logged: $story/$task"
 }
 
-# ── design approval ──────────────────────────────────────────────────────────
+# ── task approval ────────────────────────────────────────────────────────────
 #
 # The approval gate records `design_approved: <date> <hash>` in the task's
-# customFields, where <hash> fingerprints the `## Design` section. Editing the
-# note afterwards changes the hash, so the approval no longer holds.
+# customFields. <hash> fingerprints what the builder works from: the task
+# description above `## Design`, the `## Design` section, the ids in
+# `design_refs`, and the blocks that define those ids (in the story's spec.md,
+# or design.md; for E-ids, in its epic's `## Architecture`). Editing any of them
+# afterwards changes the hash, so the approval no longer holds.
 
-# The `## Design` section of markdown on stdin, without HTML comments or blank lines.
-design_section() {
-  section Design | awk '
+# Markdown on stdin without HTML comments, blank lines, or trailing spaces: the
+# text a fingerprint reads, so reformatting never voids an approval.
+fingerprint_lines() {
+  awk '
     /^[[:space:]]*<!--.*-->[[:space:]]*$/ { next }
     /[^[:space:]]/ { sub(/[[:space:]]+$/, ""); print }'
 }
 
+# The `## Design` section of markdown on stdin, normalized.
+design_section() { section Design | fingerprint_lines; }
+
+# The description in the task note on stdin: its body above `## Design`. Ticked
+# boxes read as unticked, so ticking an acceptance criterion keeps the approval.
+task_description() {
+  awk '
+    NR == 1 && $0 == "---" { infm = 1; next }
+    infm { if ($0 == "---") infm = 0; next }
+    { l = $0; sub(/[[:space:]]+$/, "", l) }
+    l == "## Design" { exit }
+    { if (match($0, /^[[:space:]]*[-*+] \[[xX]\]/)) $0 = substr($0, 1, RLENGTH - 2) " " substr($0, RLENGTH)
+      print }' | fingerprint_lines
+}
+
+# Fingerprint of the task note on stdin, for the story given.
+task_hash() {
+  local story="$1" content id
+  content="$(cat)"
+  {
+    printf '%s\n' "$content" | task_description
+    echo "## Design"
+    printf '%s\n' "$content" | design_section
+    for id in $(printf '%s\n' "$content" | refs_of); do
+      echo "## $id"
+      ref_blocks "$story" "$id" | fingerprint_lines
+    done
+  } | git hash-object --stdin | cut -c1-12
+}
+
+# What approvals fingerprinted before descriptions and contracts were covered:
+# the `## Design` section alone.
 design_hash() { design_section | git hash-object --stdin | cut -c1-12; }
 
 # Prints "ok <date>", "missing", or "stale" for a task; exit 0, 6, or 7.
@@ -761,7 +814,7 @@ approval_state() {
   content="$(task_content "$story" "$id" "$(claim_ref "$story" "$id")")"
   value="$(printf '%s\n' "$content" | cf design_approved)"
   if [ -z "$value" ]; then echo missing; return 6; fi
-  want="$(printf '%s\n' "$content" | design_hash)"
+  want="$(printf '%s\n' "$content" | task_hash "$story")"
   if [ "${value##* }" != "$want" ]; then echo stale; return 7; fi
   echo "ok ${value%% *}"
 }
@@ -773,7 +826,7 @@ cmd_approve() {
   if [ -z "$(design_section < "$file")" ]; then
     die "the task's ## Design section is empty; write the design note before approving"
   fi
-  stamp="$(date -u +%Y-%m-%dT%H:%MZ) $(design_hash < "$file")"
+  stamp="$(date -u +%Y-%m-%dT%H:%MZ) $(task_hash "$story" < "$file")"
   cf_put "$file" design_approved "$(q "$stamp")"
   touch_updated "$file"
   echo "approved: $story/$task ($stamp)"
@@ -786,15 +839,142 @@ cmd_approved() {
   case "$state" in
     ok*) echo "approved: $story/$task (${state#ok })" ;;
     missing) echo "not approved: $story/$task has no approved design; run the approval gate" ;;
-    stale) echo "not approved: $story/$task's design changed after approval; run the gate again" ;;
+    stale) echo "not approved: $story/$task changed after approval (its description, design, or a cited contract); run the gate again" ;;
   esac
   exit "$rc"
 }
 
+# Re-record the approval of the task note FILE, made under the earlier
+# fingerprint, under the current one, but only when its `## Design` is unchanged
+# since. Returns 1 when there is no such approval.
+restamp_approval() {
+  local story="$1" file="$2" value
+  value="$(cf design_approved < "$file")"
+  [ -n "$value" ] && [ "${value##* }" = "$(design_hash < "$file")" ] || return 1
+  cf_put "$file" design_approved "$(q "${value%% *} $(task_hash "$story" < "$file")")"
+}
+
+# ── phase approvals ──────────────────────────────────────────────────────────
+#
+# A story's gates record `spec_approved`, `design_approved`, and `plan_approved`
+# as `<date> <hash>` in the story project note's frontmatter, where <hash>
+# fingerprints the artifact the gate approved. Editing it afterwards changes the
+# hash, so the approval no longer holds. The values are top-level keys: the
+# note's `customFields` is dotpm's list of field definitions, not a map.
+
+valid_phase() { case "$1" in spec|design|plan) return 0 ;; esac; return 1; }
+
+# The file a story's phase approval covers.
+phase_file() { case "$2" in plan) echo "$STORIES/$1/plan.md" ;; *) echo "$STORIES/$1/spec.md" ;; esac; }
+
+# The text a phase approval fingerprints: the spec without its `## Design`; the
+# design (the spec's `## Design`, then design.md when the design lives there);
+# the plan with the sorted ids of the story's task notes.
+phase_text() {
+  local dir="$STORIES/$1" f
+  case "$2" in
+    spec) without_section Design < "$dir/spec.md" | fingerprint_lines ;;
+    design)
+      design_section < "$dir/spec.md"
+      if [ -f "$dir/design.md" ]; then fingerprint_lines < "$dir/design.md"; fi ;;
+    plan)
+      fingerprint_lines < "$dir/plan.md"
+      for f in "$dir"/_tasks/*.md; do if [ -f "$f" ]; then basename "$f" .md; fi; done | LC_ALL=C sort ;;
+  esac
+}
+
+phase_hash() { phase_text "$1" "$2" | git hash-object --stdin | cut -c1-12; }
+
+# Whether the story has no design: its approval then records a skipped phase.
+design_skipped() { [ -z "$(phase_text "$1" design)" ]; }
+
+# Prints "ok <date>", "missing", or "stale" for a story's PHASE approval; exit 0, 6, or 7.
+phase_state() {
+  local story="$1" phase="$2" note="$STORIES/$1/$1.md" value=""
+  if [ -f "$note" ]; then value="$(fm "${phase}_approved" < "$note")"; fi
+  if [ -z "$value" ] || [ ! -f "$(phase_file "$story" "$phase")" ]; then echo missing; return 6; fi
+  if [ "${value##* }" != "$(phase_hash "$story" "$phase")" ]; then echo stale; return 7; fi
+  echo "ok ${value%% *}"
+}
+
+phase_ok() { phase_state "$1" "$2" > /dev/null; }
+
+# Record the approval of a story's PHASE for its files as they are now.
+record_phase() {
+  local story="$1" phase="$2" stamp skipped=""
+  stamp="$(date -u +%Y-%m-%dT%H:%MZ) $(phase_hash "$story" "$phase")"
+  fm_put "$STORIES/$story/$story.md" "${phase}_approved" "$(q "$stamp")"
+  if [ "$phase" = design ] && design_skipped "$story"; then skipped=" as skipped, none written"; fi
+  echo "approved: $story $phase$skipped ($stamp)"
+}
+
+cmd_approve_phase() {
+  local story="$1" phase="${2:-}" file
+  need_story "$story" approve-phase "spec|design|plan"
+  valid_phase "$phase" || die "usage: work-state.sh approve-phase STORY spec|design|plan"
+  file="$(phase_file "$story" "$phase")"
+  [ -f "$file" ] || die "no ${file##*/} for story $story; write it before approving the $phase"
+  if [ "$phase" = plan ]; then
+    set -- "$STORIES/$story"/_tasks/*.md
+    [ -f "$1" ] || die "story $story has no task notes; create them with new-task before approving the plan"
+  fi
+  record_phase "$story" "$phase"
+}
+
+cmd_approved_phase() {
+  local story="$1" phase="${2:-}" state rc skipped=""
+  need_story "$story" approved-phase "spec|design|plan"
+  valid_phase "$phase" || die "usage: work-state.sh approved-phase STORY spec|design|plan"
+  set +e; state="$(phase_state "$story" "$phase")"; rc=$?; set -e
+  case "$state" in
+    ok*)
+      if [ "$phase" = design ] && design_skipped "$story"; then skipped="skipped, "; fi
+      echo "approved: $story $phase ($skipped${state#ok })" ;;
+    missing) echo "not approved: $story has no approved $phase; run the $phase gate" ;;
+    stale) echo "not approved: $story's $phase changed after approval; run the gate again" ;;
+  esac
+  exit "$rc"
+}
+
+# A planned story that predates recorded approvals: it has a spec, a plan, and
+# task notes, and none of its three approvals is recorded.
+legacy_story() {
+  local dir="$STORIES/$1" note="$STORIES/$1/$1.md" k
+  [ -f "$note" ] && [ -f "$dir/spec.md" ] && [ -f "$dir/plan.md" ] || return 1
+  for k in spec design plan; do
+    [ -z "$(fm "${k}_approved" < "$note")" ] || return 1
+  done
+  set -- "$dir"/_tasks/*.md
+  [ -f "$1" ]
+}
+
+# One-shot, run on the user's say-so: record the spec, design, and plan of a
+# planned story that predates approvals as approved, and re-record its task
+# approvals.
+cmd_adopt_approvals() {
+  local story="$1" dir f id
+  need_story "$story" adopt-approvals
+  dir="$STORIES/$story"
+  legacy_story "$story" || die "adopt-approvals is for a planned story (spec, plan, and task notes) with no recorded approvals; run its gates and approve-phase instead"
+  record_phase "$story" spec
+  record_phase "$story" design
+  record_phase "$story" plan
+  for f in "$dir"/_tasks/*.md; do
+    [ -f "$f" ] || continue
+    id="$(basename "$f" .md)"
+    if restamp_approval "$story" "$(task_path "$story" "$id")"; then
+      echo "approved: $story/$id (re-recorded: the fingerprint now covers its description and cited contracts)"
+    fi
+  done
+}
+
 # ── brief: the minimum context one task needs ────────────────────────────────
 
-# Blank-line-separated blocks of FILE that mention ID as a whole word, each
-# followed by the table right after it when the block introduces one.
+# The parts of the markdown on stdin that define ID, which must appear as a
+# whole word: the whole section under a heading that names it (up to the next
+# heading of the same or a higher level), else each blank-line-separated block
+# that mentions it, followed by the table right after it when the block
+# introduces one. A fenced code block never splits a block or ends a section.
 blocks_mentioning() {
   awk -v id="$1" '
     function flush() {
@@ -803,15 +983,42 @@ blocks_mentioning() {
       }
       b = ""; want = 0
     }
-    /^[[:space:]]*$/ { flush(); next }
-    { b = (b == "" ? $0 : b "\n" $0)
-      line = " " $0 " "; gsub(/[^A-Za-z0-9_-]/, " ", line)
-      if (index(line, " " id " ")) want = 1 }
-    END { flush() }' "$2"
+    function names(s,  t) { t = " " s " "; gsub(/[^A-Za-z0-9_-]/, " ", t); return index(t, " " id " ") > 0 }
+    /^[[:space:]]*(```|~~~)/ { fence = !fence }
+    { h = 0; if (!fence && match($0, /^#+ /) && RLENGTH <= 7) h = RLENGTH - 1 }
+    sec && h && h <= sec { sec = 0; print "" }
+    !sec && h && names($0) { flush(); sec = h; prev = 0 }
+    sec { print; next }
+    /^[[:space:]]*$/ && !fence { flush(); next }
+    { b = (b == "" ? $0 : b "\n" $0); if (names($0)) want = 1 }
+    END { if (sec) print ""; else flush() }'
+}
+
+# Design refs of the task note on stdin, one id per line.
+refs_of() { cf design_refs | tr -d '[]"' | tr ', ' '\n\n' | { grep -v '^$' || true; } | LC_ALL=C sort -u; }
+
+# Where design ref ID is defined: an E-id (a contract of the story's epic) in the
+# epic's epic.md, anything else (C1, ...) in the story's spec.md, or in design.md
+# when the design lives there.
+ref_origin() { case "$1" in E[0-9]*) echo epic.md ;; *) echo spec.md ;; esac; }
+
+# The blocks that define design ref ID: what `brief` shows, and what an approval
+# fingerprints. An E-id's are searched in the epic's `## Architecture` only.
+ref_blocks() {
+  local story="$1" id="$2" epic file
+  if [ "$(ref_origin "$id")" = epic.md ]; then
+    epic="$(story_epic "$story")"
+    file="$EPICS/$epic/epic.md"
+    if [ -n "$epic" ] && [ -f "$file" ]; then section Architecture < "$file" | blocks_mentioning "$id"; fi
+  else
+    for file in "$STORIES/$story/spec.md" "$STORIES/$story/design.md"; do
+      if [ -f "$file" ]; then blocks_mentioning "$id" < "$file"; fi
+    done
+  fi
 }
 
 cmd_brief() {
-  local story="$1" task="$2" ref content spec plan refs req r
+  local story="$1" task="$2" ref content spec plan req r
   need_task "$story" "$task" brief
   ref="$(claim_ref "$story" "$task")"
   content="$(task_content "$story" "$task" "$ref")"
@@ -825,10 +1032,9 @@ cmd_brief() {
     grep -F -- "$task" "$plan" || echo "(not listed in plan.md)"
   fi
   [ -f "$spec" ] || { echo; echo "== no spec at $spec"; return 0; }
-  refs="$(printf '%s\n' "$content" | cf design_refs | tr -d '[]"' | tr ',' ' ')"
-  for r in $refs; do
-    echo ; echo "== design $r (from spec.md)"
-    blocks_mentioning "$r" "$spec"
+  for r in $(printf '%s\n' "$content" | refs_of); do
+    echo ; echo "== design $r (from $(ref_origin "$r"))"
+    ref_blocks "$story" "$r"
   done
   # Requirement ids the task names in its own text (FR1, NFR3, ...).
   req="$(printf '%s\n' "$content" | grep -oE '\bN?FR[0-9]+\b' | sort -u | tr '\n' ' ' || true)"
@@ -839,34 +1045,51 @@ cmd_brief() {
   return 0
 }
 
+# The tasks of STORY whose design_refs include ID, one per line as "TASK STATUS":
+# the ones to re-gate (those not done) after the contract ID changed.
+cmd_cites() {
+  local story="$1" ref="${2:-}" f id content
+  valid_id "$story" && [ -n "$ref" ] || die "usage: work-state.sh cites STORY ID"
+  resolve
+  [ -d "$STORIES/$story" ] || die "no story '$story' under $STORIES"
+  for f in "$STORIES/$story"/_tasks/*.md; do
+    [ -f "$f" ] || continue
+    id="$(basename "$f" .md)"
+    content="$(task_content "$story" "$id" "$(claim_ref "$story" "$id")")"
+    if printf '%s\n' "$content" | refs_of | grep -Fxq -- "$ref"; then echo "$id $(printf '%s\n' "$content" | fm status)"; fi
+  done
+}
+
 # ── phase: where a story stands ──────────────────────────────────────────────
 
-# none   no story directory yet                     → start with the spec
-# spec   no spec.md                                 → write the spec
-# design no plan yet and spec.md has no "## Design" → high-level design
-# plan   no plan.md, or no task notes               → plan the tasks
-# build  some task is not complete                  → build the tasks
-# done   every task is done or cancelled
-# A planned story is past design even without "## Design": small stories skip it.
+# none    no story directory yet
+# spec    no spec.md, or its approval is missing or stale     → write or re-gate the spec
+# design  spec approved; neither design nor plan is approved  → high-level design (approving it empty skips it)
+# plan    plan not approved: no plan.md or task notes yet, or either changed since → plan the tasks
+# build   plan approved, some task is not complete (one in review is not)         → build the tasks
+# done    plan approved, every task is done or cancelled
+# Each phase ends when its gate records `approve-phase`, and holds while the
+# approved artifact stays unchanged. An approved plan keeps a story past a design
+# edited since: its tasks re-gate on the contracts they cite.
 cmd_phase() {
-  local story="$1" dir f any=0 open=0 id
+  local story="$1" phase f id open=0
   valid_id "$story" || die "usage: work-state.sh phase STORY"
   resolve
-  dir="$STORIES/$story"
-  if [ ! -d "$dir" ]; then echo "phase=none"; return 0; fi
-  if [ ! -f "$dir/spec.md" ]; then echo "phase=spec"; return 0; fi
-  for f in "$dir"/_tasks/*.md; do
-    [ -f "$f" ] || continue
-    any=1
-    id="$(basename "$f" .md)"
-    complete "$(task_content "$story" "$id" "$(claim_ref "$story" "$id")" | fm status)" || open=$((open + 1))
-  done
-  if [ ! -f "$dir/plan.md" ] || [ "$any" = 0 ]; then
-    if ! grep -q '^## Design[[:space:]]*$' "$dir/spec.md"; then echo "phase=design"; return 0; fi
-    echo "phase=plan"; return 0
+  if [ ! -d "$STORIES/$story" ]; then echo "phase=none"; return 0; fi
+  if ! phase_ok "$story" spec; then phase=spec
+  elif ! phase_ok "$story" design && ! phase_ok "$story" plan; then phase=design
+  elif ! phase_ok "$story" plan; then phase=plan
+  else
+    for f in "$STORIES/$story"/_tasks/*.md; do
+      [ -f "$f" ] || continue
+      id="$(basename "$f" .md)"
+      complete "$(task_content "$story" "$id" "$(claim_ref "$story" "$id")" | fm status)" || open=$((open + 1))
+    done
+    if [ "$open" -gt 0 ]; then phase=build; else phase=done; fi
   fi
-  if [ "$open" -gt 0 ]; then echo "phase=build"; echo "open_tasks=$open"; return 0; fi
-  echo "phase=done"
+  echo "phase=$phase"
+  if [ "$phase" = build ]; then echo "open_tasks=$open"; fi
+  if legacy_story "$story"; then echo "approvals=missing run: work-state.sh adopt-approvals $story (only if the user confirms its earlier gates passed)"; fi
 }
 
 # ── status tree ──────────────────────────────────────────────────────────────
@@ -1056,7 +1279,11 @@ $id $deps"
   fi
   if [ -n "$refs" ]; then cf_put "$file" design_refs "$(q "$refs")"; fi
   if [ -n "$owner" ]; then cf_put "$file" branch "$(q "$owner")"; fi
-  if [ -n "$approved" ]; then cf_put "$file" design_approved "$(q "$approved")"; fi
+  if [ -n "$approved" ]; then
+    cf_put "$file" design_approved "$(q "$approved")"
+    # Approvals made before descriptions and contracts were covered still hold when the design is unchanged.
+    restamp_approval "$story" "$file" || true
+  fi
   project_add_task "$STORIES/$story/$story.md" "$(link "$file")"
   if [ "$STORE" = vault ] && complete "$status"; then project_tick "$STORIES/$story/$story.md" "$(link_target "$file")" x; fi
 }
@@ -1291,7 +1518,11 @@ case "${1:-}" in
   phase) shift; cmd_phase "${1:-}" ;;
   approve) shift; cmd_approve "${1:-}" "${2:-}" ;;
   approved) shift; cmd_approved "${1:-}" "${2:-}" ;;
+  approve-phase) shift; cmd_approve_phase "${1:-}" "${2:-}" ;;
+  approved-phase) shift; cmd_approved_phase "${1:-}" "${2:-}" ;;
+  adopt-approvals) shift; cmd_adopt_approvals "${1:-}" ;;
+  cites) shift; cmd_cites "${1:-}" "${2:-}" ;;
   migrate) shift; cmd_migrate "${1:-}" ;;
   hint) cmd_hint ;;
-  *) die "usage: work-state.sh {root|configure DIR [EPICS_DIR]|init-epic EPIC TITLE|init-story STORY TITLE [EPIC]|new-task STORY TITLE [DEP...]|path STORY [TASK]|field STORY TASK KEY VALUE|set STORY TASK STATUS|log STORY TASK TEXT|next [STORY]|claim STORY TASK [WORK]|release STORY TASK|status [STORY]|brief STORY TASK|phase STORY|approve STORY TASK|approved STORY TASK|migrate [STORY]|hint}" ;;
+  *) die "usage: work-state.sh {root|configure DIR [EPICS_DIR]|init-epic EPIC TITLE|init-story STORY TITLE [EPIC]|new-task STORY TITLE [DEP...]|path STORY [TASK]|field STORY TASK KEY VALUE|set STORY TASK STATUS|log STORY TASK TEXT|next [STORY]|claim STORY TASK [WORK]|release STORY TASK|status [STORY]|brief STORY TASK|phase STORY|approve STORY TASK|approved STORY TASK|approve-phase STORY PHASE|approved-phase STORY PHASE|adopt-approvals STORY|cites STORY ID|migrate [STORY]|hint}" ;;
 esac

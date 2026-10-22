@@ -45,7 +45,7 @@ files: <paths the main thread may want to open>
 next: <the recommended next action, or "none">
 ```
 
-Anything longer goes into a file, and the summary points to it. The main thread opens a file only when a decision needs it.
+Anything longer goes into a file, and the summary points to it. The main thread opens a file only when a decision needs it. A `task-builder` reports `review` where this says `done`: its task is only done once the review passes (`work-artifacts.md`, "Finishing").
 
 ## Parallel Fan-out
 

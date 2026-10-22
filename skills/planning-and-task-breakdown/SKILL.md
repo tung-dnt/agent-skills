@@ -95,7 +95,7 @@ Each task follows this structure, whether it lands in its own task note or as an
 - [ ] Build succeeds: [the repository's build command]
 - [ ] Manual check: [description of what to verify]
 
-**Dependencies and design refs:** recorded in the task note's frontmatter, never typed by hand: dependencies are passed to `work-state.sh new-task` (task ids, or none), and `work-state.sh field [story-id] [task-id] design_refs "C1, C3"` stores the shared contract ids from the design, so `/build` can read them.
+**Dependencies and design refs:** recorded in the task note's frontmatter, never typed by hand: dependencies are passed to `work-state.sh new-task` (task ids, or none), and `work-state.sh field [story-id] [task-id] design_refs "C1, E2"` stores the shared contract ids the task cites (`C` ids from the story's design, `E` ids from its epic's architecture), so `/build` can read them.
 
 **Files likely touched:**
 - `src/path/to/file.ts`
@@ -127,7 +127,7 @@ Add each checkpoint to the task list target as a task of its own, depending on t
 
 **Planning choices are trade-offs too.** When the slicing or order has real alternatives, put each to the user at the plan gate as a decision brief (`../../references/approval-gate.md`) instead of deciding silently. Typical ones: risk-first vs value-first order, one PR vs several, parallel vs sequential tasks, reuse vs build.
 
-Before any task is built, the plan passes the approval gate (`../../references/approval-gate.md`): a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead.
+Before any task is built, the plan passes the approval gate (`../../references/approval-gate.md`): a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead. Run it once the task notes exist, then record it with `work-state.sh approve-phase [story-id] plan`. The approval fingerprints the plan and the ids of the task notes, so adding a task afterwards voids it (see Re-planning and Splitting).
 
 ## Task Sizing Guidelines
 
@@ -164,6 +164,15 @@ Each story gets its own directory, so planning a new story never touches another
 
 The same rule applies to an external task list target: never bulk-close or delete another plan's open tracker items to make room for new ones.
 
+### Re-planning and Splitting
+
+A task that turns out too big (`low-level-design`, step 7), or work nobody planned, changes the approved plan. The procedure is in `../../references/work-artifacts.md` ("Re-planning and Splitting"); in short:
+
+1. **Retire the old task:** `work-state.sh set [story-id] [task-id] cancelled`, then `work-state.sh log [story-id] [task-id] "split into t07-…, t08-…: [reason]"`. The note stays and its id is never reused. Never do this to a task another session has claimed.
+2. **Add the replacements:** `work-state.sh new-task [story-id] "T07 [title]" [dependency-task-id…]` with the next free T number (one past the highest in the story, cancelled tasks included), then their `design_refs` and descriptions as in the Task List Target. A task that depended on the retired one now sees it as complete: if it must wait for the replacements, retire it the same way and recreate it with them as its dependencies.
+3. **Update the plan in place:** the new rows in order, and `split into …` on the old row.
+4. **Run the plan gate again** and record it with `work-state.sh approve-phase [story-id] plan`. The new task note changed the plan's fingerprint, so the story is back at phase `plan` until then.
+
 ### Task List Target
 
 The task list target is where tasks and checkpoints are recorded. It is defined once, here; every other reference in this skill defers to it.
@@ -172,12 +181,14 @@ The task list target is where tasks and checkpoints are recorded. It is defined 
   1. `bash [plugin-root]/hooks/work-state.sh init-story [story-id] "[Story title]" [epic-id]` creates the story's project note if it is missing (pass the epic id only when the story belongs to an epic).
   2. For each task, in plan order: `work-state.sh new-task [story-id] "T02 Apply event" [dep-id…]`. The title starts with the plan number; the task id comes from it (`t02-apply-event`). Dependencies are task ids that already exist, so create tasks in dependency order. The command prints `task=[task-id]` and `path=…`.
   3. Insert the Step 4 structure (description, acceptance criteria, verification, files, scope) into the note at that path, **above** `## Design`. Leave `## Design`, `## Summary`, `## Checklist`, and `## Log` empty.
-  4. `work-state.sh field [story-id] [task-id] design_refs "C3, C4"` records the contracts the task cites.
+  4. `work-state.sh field [story-id] [task-id] design_refs "C3, E1"` records the contracts the task cites: `C` ids from the story's design, `E` ids from its epic's.
 
   Every task starts as `todo`. Record checkpoints (Step 5) the same way.
 - **External tracker:** if the project's agent rules (`CLAUDE.md`, `AGENTS.md`, etc.) or the user designate an issue tracker (e.g. GitHub Issues, Jira, Linear, `bd`/beads), create one tracker item per task instead of writing task notes. Map the Step 4 structure onto the tracker's fields: acceptance criteria and verification steps in the item body, dependencies via the tracker's linking mechanism (`bd dep add`, "blocked by", etc.). Record Step 5 checkpoints as tracker items too, or as a checklist in the plan document if the tracker has no natural equivalent.
 
 When using an external tracker, note it in `[stories-dir]/[story-id]/plan.md` (e.g. "Tasks tracked in Linear project FOO") so downstream steps and future sessions know where to look, and keep the plan document's Task List section as an ordered index of tracker item IDs or links rather than a duplicate checklist.
+
+Approvals for tracked tasks live in the tracker item, not in task notes, so `work-state.sh approve` and `approve-phase … plan` can't be used for them; External Trackers in `../../references/work-artifacts.md` says where the go-ahead is recorded.
 
 ## Plan Document Template
 
@@ -255,7 +266,7 @@ Before starting implementation, confirm:
 - [ ] No pre-existing incomplete plan was overwritten without explicit user confirmation
 - [ ] No task touches more than ~5 files
 - [ ] Checkpoints exist between major phases
-- [ ] The plan passed the approval gate: summary shown, `grill-me` frontier empty, explicit go-ahead
+- [ ] The plan passed the approval gate: summary shown, `grill-me` frontier empty, explicit go-ahead, recorded with `work-state.sh approve-phase [story-id] plan`
 
 ## See Also
 
