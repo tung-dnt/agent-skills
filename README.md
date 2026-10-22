@@ -60,24 +60,67 @@ Skills also activate automatically based on what you're doing — designing an A
 
 ### A workflow for each scope of work
 
-`/epic`, `/story`, and `/task` run these workflows. Each starts with a scope check: if the request belongs to a different scope, it says so and recommends the right command before writing anything. They work with or without a tracker. A ticket key or URL is read as input, and without a tracker the repository's folders are the tracker.
+`/epic`, `/story`, and `/task` run these workflows. Every planning phase ends in a recorded approval, and nothing is built until `work-state.sh` confirms that approval still matches the files. They work with or without a tracker: a ticket key or URL is read as input, and without a tracker the repository's folders are the tracker.
 
-| Scope | Workflow | Produces |
-|---|---|---|
-| **Epic / project** | `interview-me` → `idea-refine` → `spec-driven-development` → `constraint-driven-development` → `high-level-design` (architecture) → `planning-and-task-breakdown` (story map) | Product requirements, `CONSTRAINTS.md`, ADRs, the story map |
-| **Story** | Spec with `FR`/`NFR` ids → `high-level-design` (system shape and shared contracts `C1…`) → fresh-context critique → `planning-and-task-breakdown` | `spec.md` with `## Design`, `plan.md`, one task note per task |
-| **Task** | `low-level-design` note → `test-driven-development` → `incremental-implementation` → `code-review-and-quality`, which checks the diff against the note | Design note, tests, one commit per task |
+```mermaid
+flowchart TD
+    R[Request] --> SC{Scope check<br/>+ Jev shadow}
+    SC -->|epic| E[/epic: interview → epic.md → architecture E1… → story map/]
+    SC -->|story| S1
+    SC -->|task| T0[/task: one-task story/]
+    E --> S1
+    subgraph Story ["/story — resumes at the phase work-state.sh reports"]
+      S1[Spec: FR/NFR + testable AC] --> G1{Gate → plan-mode review<br/>approve-phase spec}
+      G1 --> S2[High-level design: 11 steps, checkpoint after each<br/>shared contracts C1…]
+      S2 --> G2{Fresh-context review → gate → plan-mode review<br/>approve-phase design}
+      G2 --> S3[Plan: plan.md + one task note per task]
+      S3 --> G3{Gate → plan-mode review<br/>approve-phase plan}
+    end
+    G3 --> T1
+    T0 --> T1
+    subgraph Task ["/task or /build — once per task"]
+      T1[next → claim lock] --> T2[Investigate: bugs only, checkpoint]
+      T2 --> T3[Low-level design: 6 steps, checkpoint after each]
+      T3 --> G4{Gate → plan-mode review<br/>approve task}
+      G4 --> T4[task-builder: rechecks approval, builds test-first<br/>→ status review]
+      T4 --> T5[code-reviewer + security-auditor when it applies]
+      T5 -->|Critical/Important| T4
+      T5 --> T6[done → commit → merge → release lock]
+    end
+    T6 -->|next task| T1
+```
 
-A task that needs to change a shared contract escalates it to the story's design instead of changing it silently.
+| Phase | Command | Produces | Approval recorded as |
+|---|---|---|---|
+| Scope check | every command | epic, story, or task | Your confirmation when the scope looks wrong. Jev logs its guess but doesn't act on it |
+| Epic | `/epic` | `epic.md`, `## Architecture` (`E1…`), story stubs | `summary.md`; its stories stay at phase `spec` until `/story` |
+| Spec | `/story` | `spec.md` with `FR`/`NFR` ids | `spec_approved` in the story note's frontmatter |
+| High-level design | `/story` | `## Design`, shared contracts `C1…` | `design_approved`, or recorded as skipped |
+| Plan | `/story` | `plan.md` + `_tasks/*.md` | `plan_approved` (covers the plan and the list of task ids) |
+| Task design | `/task` | the task's `## Design` (5–15 lines) | the task's `design_approved` (covers its description, design, and the text of each contract it cites) |
+| Build | `task-builder` | code and tests, status `review` | — |
+| Review → done | main session | `done`, merge, lock released | — |
 
-**Nothing starts without your go-ahead.** Every spec, design, plan, and task passes one approval gate ([references/approval-gate.md](references/approval-gate.md)):
-1. A one-screen **catch-up summary**: Business context · Proposed fix fit · Root cause (bugs) · Recommendation · Open decisions. It is also saved to `[stories-dir]/[story-id]/summary.md`, or to the task note's `## Summary`.
-2. **`grill-me` rounds** over the open decisions. Every gate asks at least one question.
-3. Your **explicit go-ahead**. `/build auto` holds one gate over the whole plan and every design note, then runs autonomously.
+**Every gate** ([references/approval-gate.md](references/approval-gate.md)):
+1. A one-screen **catch-up summary** (Business context · Proposed fix fit · Root cause for bugs · Recommendation · Open decisions), saved to `[stories-dir]/[story-id]/summary.md` or the task note's `## Summary`.
+2. **`grill-me` rounds** until nothing is open; each round is one `ask` dialog.
+3. **In omp, a plan-mode review:** the agent asks you to turn plan mode on (Alt+Shift+P), submits the phase to omp's Plan Review, and your approval there (`keep`) is the go-ahead. `refine` sends it back with your feedback. Other hosts take the go-ahead as an answer to "Proceed?".
+4. The go-ahead is **recorded** with `approve` / `approve-phase`.
 
-**Your go-ahead is recorded, and it only holds while what you approved is unchanged.** The gate stores a fingerprint with each approval: `approve-phase` for a story's spec, design, and plan, `approve` for a task's design. A story's phase advances only on a recorded approval, so a stub spec or a half-written design never counts as approved. Editing an approved spec, design, plan, task description, or a contract that a task cites voids the approval, and the gate runs again (`work-state.sh cites` lists the tasks that cite a changed contract). A task whose acceptance criteria pass goes to `review`, and is `done` only after the review passes.
+Before the gate, `/story` and `/task` stop at a **step checkpoint** after the investigation and after every design step, so you approve the design piece by piece. `/build auto` and "don't stop" skip the checkpoints and pass one gate over every task design.
 
-**You see each step as it's done.** Before the gate, `/task` and `/story` stop at a **step checkpoint** after the investigation and after every high-level and low-level design step. Each checkpoint shows what the step produced and asks about its decision, or "Continue?", so you approve the design piece by piece instead of all at once at the end. Say "don't stop" to skip the checkpoints; the gate stays.
+**What makes the tasks reliable:**
+- **No building on a draft.** `phase` advances only on a recorded approval of an unchanged file. Editing an approved spec, design, or plan voids its approval.
+- **No building on a stale contract.** Changing a contract voids every task design that cites it; `work-state.sh cites STORY C3` lists them so each goes through its gate again.
+- **Checked twice.** The orchestrator runs `approved` before starting a builder, and the builder runs it again; if it fails, the builder reports `blocked`.
+- **One owner per task.** The claim is a git lock (see below), so no two sessions, worktrees, or machines take the same task.
+- **Safe parallel waves.** `/build auto` never puts two tasks that touch the same files in one wave; each task gets its own worktree.
+- **Builder limits.** Test-first, commits only its own paths, never changes a shared contract, and stops with `blocked`, `failed`, or `needs-command` instead of guessing.
+- **`done` means reviewed.** A task whose acceptance criteria pass goes to `review`; it is `done` only after code review (plus security review for auth or personal data) passes.
+- **Resumable.** Status, `## Log` lines, claims, and worktrees are on disk; `/resume` rebuilds where each task stopped.
+- **Measured before trusted.** An optional [Jev shadow pilot](hooks/JEV-SHADOW.md) logs TypeSafe Jev's answer at each checkpoint and scope check next to what actually happened, without acting on it, so a threshold for skipping checkpoints can be set from data (`jev.sh report`).
+
+**Known weak spots:** a story stops about 13 times before planning and about 7 times per task, plus a keypress per plan-mode review; plan mode can only be turned on by you; an epic's approval lives only in its `summary.md`.
 
 ### Artifacts that are safe for parallel sessions
 
