@@ -40,3 +40,9 @@ in progress:
 flags: <ticked-but-missing work, merged locks to release, or "none">
 recommended: <one action>
 ```
+
+## Composition
+
+- **Invoke directly when:** the user wants to know where unfinished work stands without changing anything.
+- **Invoke via:** `/resume` (step 2, in a fresh context).
+- **Do not invoke from another persona.** Put the recommended next action in the report; the orchestrator confirms it with the user. See [docs/agents.md](../docs/agents.md).
