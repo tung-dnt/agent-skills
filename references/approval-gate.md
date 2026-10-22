@@ -78,11 +78,20 @@ Run the `grill-me` skill over the open decisions: rounds of numbered questions w
 
 **Ask the approach, not just the details.** For a bug, or any change where more than one approach is plausible, the first round includes the approach as a decision brief. For example: "copy the vendor files into the repo" vs "install and bundle them", compared on effort, risk, and reversibility. Never pick the approach silently.
 
-**Every gate asks at least one question.** When nothing is open, the round is a single question, "Proceed with this <spec | design | plan | task>?", with your recommended answer. A gate never passes silently.
+**Every gate asks at least one question.** When nothing is open, the round is a single question, "Proceed with this <spec | design | plan | task>?", with your recommended answer. In omp that closing question is the plan-mode review (see Confirmation), not an `ask`. A gate never passes silently.
 
 ### 3. Confirmation
 
 Continue only on an explicit go-ahead. A hedged reply ("looks fine I guess") is not a go-ahead: ask what's holding them back. When an answer changes the artifact, update it and the summary, then run the gate again.
+
+**In omp, the go-ahead is given in plan mode.** At the end of every planning phase (an epic's requirements, architecture, or story map; a story's spec, design, or plan; a task's design note), once the grill's frontier is empty:
+
+1. Stop and ask the user to turn plan mode on (Alt+Shift+P), naming the phase whose review follows. The agent can't switch it on itself. Wait until the session reports plan mode is active; don't edit anything in the meantime.
+2. Write the plan file `local://[story-id]-[phase]-plan.md` (task gates: `[story-id]-[task-id]-design-plan.md`; epic gates: `[epic-id]-[step]-plan.md`): the catch-up summary, the decisions the grill settled, the artifact's absolute path, and for a task gate its `## Design` verbatim.
+3. Submit it with a write of the slug to `xd://propose`. omp opens its Plan Review: an approval (`keep` is the one that keeps this conversation's context) is the explicit go-ahead. `refine` carries the user's feedback: revise the artifact and the summary, and run the gate again. A dismissed review is not a go-ahead.
+4. After an approval, plan mode is off again: record the go-ahead (below), then continue with the next step.
+
+Batch mode (`/build auto`, "don't stop") passes one plan-mode review over all of its notes. Hosts without plan mode (Claude Code without it, Gemini, Codex) take the go-ahead as an answer to the closing "Proceed?" question.
 
 **Record it.** Every gate records its go-ahead where a script can check it, so a later step reads the record instead of trusting the conversation. Record only after the explicit go-ahead, never to make a phase advance:
 
