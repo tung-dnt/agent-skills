@@ -30,7 +30,7 @@ In Claude Code the tier is the `model:` field in an agent's frontmatter, or the 
 |---|---|---|
 | Epic | Interview (subagents can't ask the user), product requirements, story map | Architecture and codebase discovery (fast) · parallel option generation for `idea-refine` (balanced) · critique of the requirements (deep, fresh context) |
 | Story | Requirements, the `## Design` itself, approval gates | Reading the existing architecture (fast) · `doubt-driven-development` critique (deep, fresh context) · creating task notes from the approved design (balanced) |
-| Task | A thin loop: pick, claim, delegate, collect | `task-builder` per claimed task (balanced), in parallel for independent tasks · `code-reviewer` per diff (balanced) · `security-auditor` when the task touches auth or sensitive data (deep) |
+| Task | A thin loop: pick, claim, delegate, collect; at a design gate, the checkpoints and the approval | `task-builder` per claimed task (balanced), in parallel for independent tasks · `code-reviewer` per diff (balanced) · `security-auditor` when the task touches auth or sensitive data (deep) · every task's design draft ahead of its review, in the `/build` pipeline (balanced) |
 | Resume | Presenting the result and asking which task to continue | `state-investigator` (fast, read-only) |
 
 ## Output Contract
@@ -49,9 +49,9 @@ Anything longer goes into a file, and the summary points to it. The main thread 
 
 ## Parallel Fan-out
 
-- Fan out only over **independent** work: tasks that `work-state.sh next` returns while their dependencies are already done, or review dimensions over the same diff.
+- Fan out only over **independent** work: tasks that `work-state.sh ready` lists (approved, dependencies done, no file shared with a running task or with each other), or review dimensions over the same diff.
 - Default to at most **3** concurrent subagents and never more than 5. Parallel runs raise peak spend and rate-limit pressure even while they lower the cost per task.
-- Launch a wave's subagents back-to-back without waiting for results (in one turn where the host allows), so they run concurrently. Collect all the summaries before starting the next wave.
+- Launch a wave's subagents back-to-back without waiting for results (in one turn where the host allows), so they run concurrently. In `/build auto`, collect all the summaries before starting the next wave. In the `/build` pipeline builders start one at a time, as designs are approved, and run in the background while the main thread reviews the next design; a finished builder frees its slot for the next task `ready` lists.
 - Each builder works in its own worktree on its own claim (see `work-artifacts.md`), so builders never share files or a git index.
 
 ## Subagent Command Rules
@@ -70,6 +70,23 @@ The agents in `agents/` carry a copy of these rules. When they change, update ev
 1. A fast-tier job that is unsure or fails is re-run at the balanced tier.
 2. A balanced-tier builder that fails the same task twice (tests can't be made to pass, or the design note doesn't hold) is re-run at the deep tier with a summary of both failures.
 3. A deep-tier failure stops and goes to the user. Model changes don't fix unclear requirements.
+
+## Fresh Orchestrator at Boundaries
+
+A long-lived orchestrator drags its whole history into every call. Measured on this workflow, the median main context of orchestrator sessions was 364–395k tokens, because single sessions ran for 20–45 hours. Nothing the next step needs is in that history: approvals, task status, logs, claims, and worktrees are on disk. So at a boundary the best move is to start over.
+
+A **boundary** is a point where what just finished is recorded on disk and the next step needs nothing from the conversation:
+
+- a `/story` gate has recorded its approval: `approve-phase` for the spec, the design, or the plan;
+- a build wave is complete. In `/build auto`, every builder of the wave has reported and its task is reviewed, `done`, merged, and released. In the `/build` pipeline, where builders start and finish continuously, the pipeline has gone idle after building: every builder started since the last boundary has reported and its task is merged and released, no builder is running, and `work-state.sh ready` exits 4.
+
+At a boundary, in this order:
+
+1. **Log what is next.** `work-state.sh log [story-id] [task-id] "next: <exact command> — <what it does>"` on the task the next step starts from: the first `todo` task after the plan gate, or the last task merged after a wave. Before any task exists (after the spec or the design gate), the recorded approval is the log: `work-state.sh phase [story-id]` names the next phase.
+2. **Tell the user the exact next command:** `/story [story-id]` for the next phase, `/build [story-id]` (or `/build auto [story-id]`) for the next wave, `/resume [story-id]` when a claimed task is still open, `/review` for the whole-story review.
+3. **Recommend a new session** for it, with the reason in one line: this session's context only grows, and the work is safe on disk. In omp, the experimental `new_context` tool, when enabled (`/settings` → Context → Compaction, with the working notes saved through `context_notes` first), opens a fresh context window in the same session instead.
+
+This is a recommendation at a boundary, never an interruption: don't deliver it in the middle of a gate or a checkpoint, and when the user answers to continue, continue here. An interactive flow (`/story`, the `/build` pipeline) ends its message with the recommendation and waits for the reply. An unattended run (`/build auto`) puts it in the wave's status line and carries on.
 
 ## Anti-patterns
 

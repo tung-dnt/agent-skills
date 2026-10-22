@@ -44,7 +44,7 @@ Every piece of work belongs to one scope, and each scope has one entry command. 
 | Scope | Command | Owns | Hands off to |
 |---|---|---|---|
 | Epic / project | `/epic` | `[epics-dir]/[epic-id]/epic.md` (requirements, story map, and `## Architecture` with contract ids `E1…`; or `SPEC.md` for a whole product), `CONSTRAINTS.md`, architecture ADRs, story stubs | `/story` |
-| Story | `/story` | `[stories-dir]/[story-id]/spec.md` with `## Design`, `plan.md`, task notes | `/task` or `/build auto` |
+| Story | `/story` | `[stories-dir]/[story-id]/spec.md` with `## Design`, `plan.md`, task notes | `/task`, `/build`, or `/build auto` |
 | Task / subtask | `/task` | One task note's `## Design`, `## Checklist`, `## Log`, and that task's code | The next task |
 
 ### Scope check
@@ -72,7 +72,7 @@ If the signals point to a different scope from the command that was run, say so 
 | `spec` | No `spec.md`, or its approval is missing or stale (the spec, outside `## Design`, changed since) | Write or revise the spec, pass its gate, `approve-phase [story-id] spec` |
 | `design` | Spec approved; neither the design nor the plan is approved (missing or stale) | High-level design, its gate, `approve-phase [story-id] design`. A story that needs no design records the skip with the same command and no `## Design` written. |
 | `plan` | Plan not approved: no `plan.md` or task notes yet, or either changed since approval | Plan the tasks, pass the gate, `approve-phase [story-id] plan` |
-| `build` | Plan approved, some task isn't complete (`open_tasks=N`; a task in `review` is still open) | `/task` or `/build auto` |
+| `build` | Plan approved, some task isn't complete (`open_tasks=N`; a task in `review` is still open) | `/build`, `/task`, or `/build auto` |
 | `done` | Plan approved, every task is complete (`done` or `cancelled`) | Review the story as a whole, then ship |
 
 An approved plan keeps a story in `build` when the design is edited later: its tasks re-gate on the contracts they cite instead. Editing the spec or the plan, or adding a task note, voids that approval and returns the story to `spec` or `plan` until its gate runs again (see Re-planning and Splitting).
@@ -192,10 +192,21 @@ A claim is a **lock ref**, `claim/[story-id]/[task-id]`, pointing at a unique co
 | Step | Command | What it does |
 |---|---|---|
 | Pick | `work-state.sh next [story-id]` | Fetches with `--prune`, then prints the first `todo` task with no claim whose dependencies are complete. In the repo store, "complete" is checked **in this checkout** (merged here, not just finished on another branch). In the vault store, a dependency counts once it is complete and its claim is gone: a released lock means merged. Exit 4 means nothing is claimable. |
+| Pick for a wave | `work-state.sh ready [story-id]` | Fetches, then prints one `story/task` per line, in plan order, for every task that can start now: `todo` with no claim, `approved` exits 0, every dependency complete (as `next` counts it), and no file shared with a running task or with a task printed above it. Exit 4 means none. The rules are below. |
 | Claim | `work-state.sh claim [story-id] [task-id] [work-branch]` | Creates the lock with `git update-ref <ref> <commit> ""`, which fails if it already exists. With a remote, it pushes with an empty `--force-with-lease`, so the push fails if another machine holds the lock, even one this machine couldn't see. Exit 3 means another session won; pick again. Exit 5 means the lock couldn't be published. Once the lock is held, it sets `status: in-progress` and `branch` to the work branch, which defaults to the current branch. In the repo store, when the work branch has no checkout yet, it leaves the note alone (the edit would sit in this checkout, in the way of the merge) and prints the `work-state.sh set [story-id] [task-id] in-progress` command to run from the new worktree; that also records the branch. |
 | Release | `work-state.sh release [story-id] [task-id]` | Deletes the lock locally and on the remote. The status is unchanged. |
 
 Before picking, bring the base branch up to date (`git pull --ff-only`) so tasks finished and merged elsewhere show as complete.
+
+**Starting several tasks at once.** A wave is claimed from the output of `work-state.sh ready`, not by eyeballing which tasks look independent:
+
+- A task is *running* when it has a claim (held here or on another machine) or its status is `in-progress`, `review`, or `blocked`. A `done` task still holds its files while its lock is held, because releasing the lock means its work is merged.
+- Take tasks from the top of the list, up to the wave cap: 3 running builders by default, never more than 5 (`model-routing.md`). Every listed task is clear of every other, so any prefix of the list is safe. Claim each with the Claim step above, and create its worktree only after the claim succeeds.
+- A task `ready` holds back is reported on stderr, not stdout: `skipped: [story-id]/[task-id] overlaps [story-id]/[other-task] (running|ready) on <file>`, or `on shared output <pattern> (<file>, <file>)`. It isn't lost: `ready` lists it again once the other task is merged and its lock released. A listed task whose note names no files gets `note: [story-id]/[task-id] lists no files, so its overlap with other tasks is unchecked`.
+- A task's files are the paths in the `Files likely touched` list of its description (the Step 4 structure, above `## Design`) and the backticked paths in `## Design` that read as files (`src/a.ts`, `src/dir/`, `e2e/*`; not `router.query`). So write every file the task creates or changes, one backticked path per item, generated files and lockfiles included.
+- Paths are compared as written, after a leading `./` is dropped. Two overlap when they are equal, when one is the tail of the other at a `/` (`user.gql` and `graphql/types/user.gql`), when one is a directory (`src/auth/`, or any path with no extension) that holds the other, or when one is a glob (`e2e/*`) that matches the other or both are globs that could match one file.
+- Shared outputs overlap whatever their paths: two tasks that each touch a file matching one of `*.lock`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`, `bun.lockb`, `go.sum`, `schema.sql`, `structure.sql`, `schema.rb`, or `*querier.go` can't run together, because either one rewrites it. The list is `SHARED_OUTPUTS` at the top of `hooks/work-state.sh`.
+- The check reads only what the notes say. A file a task changes without naming it surfaces at the merge, and a merge conflict stops the run for the user.
 
 **Working the task:**
 
@@ -258,6 +269,8 @@ A closed or crashed session loses its conversation, not its state. Everything ne
 3. Show the result to the user and confirm the next action before continuing. Continuing a claimed task means working on its recorded work branch or worktree, not claiming again.
 
 A new session in Claude Code also gets a one-line hint at startup when claims exist, naming the ones whose work branch is the current checkout (`work-state.sh hint`, local refs only so startup stays fast and offline). It suggests `/resume`; it never runs it.
+
+A session can also be ended on purpose. At a story gate or after a build wave, the orchestrator logs what is next and recommends a fresh session; `/resume`, `/story`, or `/build` picks up from the files above (`model-routing.md`, "Fresh Orchestrator at Boundaries").
 
 ## Obsidian (dotpm) Compatibility
 

@@ -78,7 +78,7 @@ Pre-configured specialist personas for targeted reviews, plus two workers that t
 | [test-engineer](../agents/test-engineer.md) | QA Specialist | sonnet | Test strategy, coverage analysis, and the Prove-It pattern |
 | [security-auditor](../agents/security-auditor.md) | Security Engineer | inherit | Vulnerability detection, threat modeling, OWASP assessment |
 | [web-performance-auditor](../agents/web-performance-auditor.md) | Web Performance Engineer | sonnet | Core Web Vitals audit with Quick/Deep modes and a metric-honesty rule; run it via `/webperf` |
-| [task-builder](../agents/task-builder.md) | Implementer | sonnet | Builds one claimed task test-first in its own worktree; used by `/build auto` |
+| [task-builder](../agents/task-builder.md) | Implementer | sonnet | Builds one claimed task test-first in its own worktree; used by `/task`, `/build`, and `/build auto` |
 | [state-investigator](../agents/state-investigator.md) | Read-only investigator | haiku | Reconstructs where in-progress work stopped; used by `/resume` |
 
 See [docs/agents.md](agents.md) for the decision matrix, orchestration rules, and how personas compose with skills and slash commands.

@@ -487,6 +487,171 @@ has "done after review completes the task" "$(cat "$(note pay t01-first)")" "com
 has "and unlocks its dependent" "$(ws next pay)" "pay/t02-second"
 has "phase counts it as complete" "$(ws phase pay)" "open_tasks=1"
 
+echo "ready: the tasks a wave can start"
+# A task ready for its gate: a description with a Files line, a design, no approval yet.
+# ready_task STORY TITLE FILES [DEP-ID...]; the design is $DESIGN, the scope line $SCOPE.
+ready_task() {
+  local story="$1" title="$2" files="$3" id file
+  shift 3
+  id=$(ws new-task "$story" "$title" "$@" | sed -n 's/^task=//p')
+  file=$(ws path "$story" "$id")
+  describe "$file" "$(printf '**Description:** %s.\n\n**Files likely touched:** %s\n\n**Estimated scope:** %s' "$title" "$files" "${SCOPE:-S}")"
+  after_heading "$file" Design "${DESIGN:-- Edge: x()}"
+}
+approve_all() { local s="$1" t; shift; for t in "$@"; do ws approve "$s" "$t" >/dev/null; done; }
+rdy() { "$BASH_BIN" "$SCRIPT" ready "$@" 2>/dev/null || true; }          # the listed tasks
+skips() { "$BASH_BIN" "$SCRIPT" ready "$@" 2>&1 >/dev/null || true; }    # why some were held back
+new_repo ready
+story shop 'Shop'
+ready_task shop 'T01 schema' '`src/db/schema.ts`, `migrations/001_init.sql`'
+ready_task shop 'T02 cart api' '`src/api/cart.ts`' t01-schema
+ready_task shop 'T03 cart ui' '`src/ui/cart.tsx`'
+ready_task shop 'T04 seed data' '`src/db/schema.ts`'
+f=$(note shop t01-schema)
+git add -A && git commit --quiet -m plan
+is "ready changes nothing" "$(rdy shop; git status --porcelain)" ""
+is "no approved design means nothing is ready (exit 4)" "$(code ready shop)" "4"
+has "ready needs a story id" "$(ws ready)" "usage: work-state.sh ready STORY"
+has "ready needs a known story" "$(ws ready nope)" "no story 'nope'"
+ws approve shop t01-schema >/dev/null
+is "an approved task is listed as story/task" "$(rdy shop)" "shop/t01-schema"
+describe "$f" 'Edited after the approval.'
+is "a task whose approval went stale is not ready (approved says 7)" "$(code approved shop t01-schema)$(code ready shop)" "74"
+ws approve shop t01-schema >/dev/null
+approve_all shop t02-cart-api t03-cart-ui t04-seed-data
+out=$(rdy shop)
+is "ready lists what can start together, in plan order" "$out" "shop/t01-schema
+shop/t03-cart-ui"
+lacks "a task whose dependency is not complete is not ready" "$out" "t02-cart-api"
+has "a candidate sharing a file with an earlier one is skipped, and stderr says why" "$(skips shop)" "skipped: shop/t04-seed-data overlaps shop/t01-schema (ready) on src/db/schema.ts"
+ws claim shop t01-schema >/dev/null
+is "a claimed task is not offered again" "$(rdy shop)" "shop/t03-cart-ui"
+has "a candidate sharing a file with a running task is skipped" "$(skips shop)" "skipped: shop/t04-seed-data overlaps shop/t01-schema (running) on src/db/schema.ts"
+set_status shop t01-schema review
+is "a task in review still holds its files" "$(rdy shop)" "shop/t03-cart-ui"
+set_status shop t01-schema done
+is "a finished dependency opens its dependent" "$(rdy shop)" "shop/t02-cart-api
+shop/t03-cart-ui"
+has "while the unreleased lock still holds its files" "$(skips shop)" "overlaps shop/t01-schema (running)"
+ws release shop t01-schema >/dev/null
+is "releasing the lock frees them" "$(rdy shop)" "shop/t02-cart-api
+shop/t03-cart-ui
+shop/t04-seed-data"
+ws claim shop t03-cart-ui >/dev/null
+set_status shop t03-cart-ui blocked
+ws release shop t03-cart-ui >/dev/null
+ready_task shop 'T05 cart polish' '`src/ui/cart.tsx`'
+ws approve shop t05-cart-polish >/dev/null
+has "a blocked task holds its files even with no lock" "$(skips shop)" "skipped: shop/t05-cart-polish overlaps shop/t03-cart-ui (running) on src/ui/cart.tsx"
+
+new_repo chain
+story chain 'Chain'
+ready_task chain 'T01 one' '`src/a.ts`'
+ready_task chain 'T02 two' '`src/a.ts`, `src/b.ts`'
+ready_task chain 'T03 three' '`src/b.ts`'
+approve_all chain t01-one t02-two t03-three
+is "a skipped candidate holds nothing back: only listed and running tasks do" "$(rdy chain)" "chain/t01-one
+chain/t03-three"
+
+echo "ready follows a task through its worktree, merge, and release"
+new_repo flow
+story api 'API'
+ready_task api 'T01 model' '`src/model.ts`'
+ready_task api 'T02 handler' '`src/handler.ts`' t01-model
+ready_task api 'T03 model tests' '`src/model.ts`'
+approve_all api t01-model t02-handler t03-model-tests
+git add -A && git commit --quiet -m "plan, designs, approvals"
+is "the first task starts; its dependent waits and the third shares its file" "$(rdy api)" "api/t01-model"
+ws claim api t01-model task/api/t01-model >/dev/null
+git worktree add --quiet -b task/api/t01-model "$TMP/flow-t01"
+(cd "$TMP/flow-t01" && "$BASH_BIN" "$SCRIPT" set api t01-model in-progress >/dev/null)
+is "a task running in a worktree holds its files, though this checkout's note says todo" "$(code ready api)" "4"
+has "and the reason names it" "$(skips api)" "skipped: api/t03-model-tests overlaps api/t01-model (running) on src/model.ts"
+(cd "$TMP/flow-t01" && "$BASH_BIN" "$SCRIPT" set api t01-model review >/dev/null && "$BASH_BIN" "$SCRIPT" set api t01-model done >/dev/null && git add -A && git commit --quiet -m "t01 done")
+is "done on an unmerged work branch opens nothing in the repository store" "$(code ready api)" "4"
+git merge --quiet --no-ff --no-edit task/api/t01-model
+is "merged, the dependent opens while the lock still holds the file" "$(rdy api)" "api/t02-handler"
+ws release api t01-model >/dev/null
+is "released, the file is free" "$(rdy api)" "api/t02-handler
+api/t03-model-tests"
+
+echo "ready: plan order, and what counts as a file"
+new_repo order
+story ord 'Order'
+ready_task ord 'T10 ten' '`src/ten.ts`'
+ready_task ord 'T2 two' '`src/two.ts`'
+approve_all ord t10-ten t2-two
+for loc in C en_US.UTF-8 en_GB.UTF-8; do
+  is "plan order is numeric, whatever the locale ($loc)" "$(export LC_ALL=$loc; rdy ord)" "ord/t2-two
+ord/t10-ten"
+done
+new_repo files
+pairs=0
+# overlap_case LABEL FILES-A FILES-B overlap|apart [DESIGN-B]: two approved tasks in a story of
+# their own; the first is listed, and the second only when the two share nothing.
+overlap_case() {
+  local label="$1" s
+  pairs=$((pairs + 1)); s="pair$pairs"
+  story "$s" "Pair $pairs"
+  ready_task "$s" 'T01 first' "$2"
+  DESIGN="${5:-}" ready_task "$s" 'T02 second' "$3"
+  approve_all "$s" t01-first t02-second
+  if [ "$4" = overlap ]; then is "$label" "$(rdy "$s")" "$s/t01-first"
+  else is "$label" "$(rdy "$s")" "$s/t01-first
+$s/t02-second"; fi
+}
+overlap_case "the same file overlaps" '`src/a.ts`' '`src/a.ts`' overlap
+overlap_case "different files do not" '`src/a.ts`' '`src/b.ts`' apart
+overlap_case "a path and its shortened form overlap" '`graphql/types/user.gql`' '`user.gql`' overlap
+overlap_case "one name in two directories does not" '`src/a/index.ts`' '`src/b/index.ts`' apart
+overlap_case "a directory overlaps a file in it" '`src/auth/`' '`src/auth/login.ts`' overlap
+overlap_case "a path with no extension may be a directory" '`src/auth`' '`src/auth/login.ts`' overlap
+overlap_case "but only a whole directory name" '`src/auth`' '`src/author/login.ts`' apart
+overlap_case "a glob overlaps a file it matches" '`e2e/*`' '`e2e/fixtures/a.ts`' overlap
+overlap_case "two globs that could match one file overlap" '`docs/x.md`, `e2e/*.spec.ts`' '`e2e/fixtures/*`' overlap
+overlap_case "two globs that cannot match one file do not" '`src/*.ts`' '`src/*.css`' apart
+overlap_case "a line number is not part of the path" '`src/a.ts:10-20`' '`src/a.ts`' overlap
+overlap_case "the template's list form: every item counts" "$(printf '\n- `src/x.ts`\n- `src/shared.ts`')" '`src/shared.ts`' overlap
+overlap_case "a list after a blank line still belongs to the label" "$(printf '\n\n- `src/shared.ts`')" '`src/shared.ts`' overlap
+overlap_case "prose around inline paths is ignored" '`src/x.ts`, new `src/shared.ts` (+ test), deleted `src/old.ts`' '`src/shared.ts`' overlap
+overlap_case "paths without backticks count" 'src/x.ts, src/shared.ts (new)' '`src/shared.ts`' overlap
+overlap_case "so do unbackticked list items" "$(printf '\n- src/x.ts\n- src/shared.ts - the handler')" '`src/shared.ts`' overlap
+SCOPE='M. Repo: `shared-repo`' overlap_case "backticks after the Files block are not files" '`src/x.ts`' '`src/y.ts`' apart
+overlap_case "lockfiles of one kind overlap in any directory" '`web/package.json`, `web/package-lock.json`' '`api/package.json`, `api/package-lock.json`' overlap
+overlap_case "lockfiles of different kinds do not" '`web/package-lock.json`' '`svc/go.sum`' apart
+overlap_case "any two *.lock files overlap" '`Cargo.lock`' '`web/yarn.lock`' overlap
+overlap_case "generated querier files overlap" '`db/orders/querier.go`' '`db/users/querier.go`' overlap
+overlap_case "schema dumps overlap" '`db/a/schema.sql`' '`db/b/schema.sql`' overlap
+overlap_case "a path in backticks in the design counts" '`src/a.ts`' '`src/b.ts`' overlap '- Edge: `src/a.ts` gains a field'
+overlap_case "code in the design is not a file" '`src/a.ts`' '`src/b.ts`' apart '- Rules: reads `router.query`, calls `useCart` and `Array.from`, a/b or c/d'
+overlap_case "a lockfile named only in the design counts" '`web/package-lock.json`' '`api/x.ts`' overlap '- Edge: regenerates `api/package-lock.json`'
+new_repo nofiles
+story nf 'No files'
+ready_task nf 'T01 bare' ''
+ws approve nf t01-bare >/dev/null
+is "a task that lists no files is still listed" "$(rdy nf)" "nf/t01-bare"
+has "and the note says its overlap is unchecked" "$(skips nf)" "note: nf/t01-bare lists no files"
+
+echo "ready sees claims made on another machine"
+git init --quiet --bare -b main "$TMP/remote-ready.git"
+new_repo seedr
+story api 'API'
+ready_task api 'T01 a' '`src/a.ts`'
+ready_task api 'T02 b' '`src/a.ts`'
+ready_task api 'T03 c' '`src/c.ts`'
+approve_all api t01-a t02-b t03-c
+git add -A && git commit --quiet -m plan
+git remote add origin "$TMP/remote-ready.git" && git push --quiet origin main
+git clone --quiet "$TMP/remote-ready.git" "$TMP/ready-a" && (cd "$TMP/ready-a" && git_id)
+git clone --quiet "$TMP/remote-ready.git" "$TMP/ready-b" && (cd "$TMP/ready-b" && git_id)
+cd "$TMP/ready-a"
+is "machine A starts with both of the tasks that don't share a file" "$(rdy api)" "api/t01-a
+api/t03-c"
+ws claim api t01-a >/dev/null
+cd "$TMP/ready-b"
+is "machine B does not offer the task machine A claimed" "$(rdy api)" "api/t03-c"
+has "and holds back a task sharing its file" "$(skips api)" "skipped: api/t02-b overlaps api/t01-a (running) on src/a.ts"
+
 echo "adopting approvals for planned stories that predate them"
 new_repo adopt
 story old 'Old'
@@ -727,6 +892,25 @@ ws approve ride t01-go >/dev/null
 has "an epic contract is read through the vault's parent link" "$(ws brief ride t01-go)" "E1 event bus: ordered."
 sed -i.bak 's/ordered/unordered/' "$V/PM/app/epics/payments/epic.md" && rm "$V/PM/app/epics/payments/epic.md.bak"
 has "editing it voids the task approval in the vault store (exit 7)" "$(code approved ride t01-go)" "7"
+
+echo "ready (vault store)"
+new_vault "$V" PM
+new_repo readyv
+story ship 'Ship'
+ready_task ship 'T01 core' '`src/core.ts`'
+ready_task ship 'T02 api' '`src/api.ts`' t01-core
+ready_task ship 'T03 core docs' '`src/core.ts`'
+approve_all ship t01-core t02-api t03-core-docs
+is "the vault store lists a ready task" "$(rdy ship)" "ship/t01-core"
+has "and holds back one that shares its file" "$(skips ship)" "skipped: ship/t03-core-docs overlaps ship/t01-core (ready) on src/core.ts"
+ws claim ship t01-core feat-core >/dev/null
+is "a claimed task holds its files there too" "$(code ready ship)" "4"
+set_status ship t01-core done
+is "a done dependency whose lock is still held is not finished" "$(code ready ship)" "4"
+ws release ship t01-core >/dev/null
+is "released, it opens its dependent and frees its file" "$(rdy ship)" "ship/t02-api
+ship/t03-core-docs"
+lacks "ready leaves the repository alone" "$(git status --porcelain)" "docs/"
 
 echo "migrate (repository store)"
 no_vault

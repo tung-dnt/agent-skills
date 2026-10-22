@@ -193,6 +193,8 @@ The same artifacts are the handoff between sessions. For a small task, run the w
 - the spec — `SPEC.md`, or wherever your spec actually lives
 - the story's `[stories-dir]/[story-id]/plan.md` and its task notes — or the external tracker the plan identifies, if you use one
 
+`/story` and `/build` say when to switch: after each approved phase and each completed build wave they log what is next, name the command to run, and recommend a new session (see [references/model-routing.md](../references/model-routing.md), "Fresh Orchestrator at Boundaries").
+
 **Before switching**, make sure those files reflect the decisions that still apply, the scope you approved, the questions still open, the next task, and the current verification state (which tests ran, against what).
 
 **In the new session**, run `/resume` (Claude Code also suggests it at startup when a claimed task exists). It has a read-only subagent rebuild the ticked progress tree, find where each in-progress task stopped, and recommend the next step. Without the command, read the actual files and look at `git status` before doing anything. Don't assume approvals you can't see in the artifacts. Treat a recorded "tests pass" as a claim about a specific baseline: re-run the checks it covers if the code has moved since, if it doesn't say what was run against what, or if you're about to touch the area it covered. If the baseline still holds, take it and get on with the next task — the point is a check proportional to what changed, not a full suite at every handoff.

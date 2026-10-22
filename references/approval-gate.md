@@ -10,7 +10,8 @@ The one checkpoint every planning, design, and build workflow passes before work
 | `/story`, `spec-driven-development` | The spec; the `## Design`; the plan | The next phase |
 | `high-level-design` | The design (after its fresh-context critique) | Task planning |
 | `planning-and-task-breakdown` | The task list | Any build |
-| `/task`, `/build`, `low-level-design` | The task's design note | Building the task |
+| `/task`, `/build [story-id]/[task-id]`, `low-level-design` | The task's design note | Building the task |
+| `/build [story-id]` (pipeline) | Each task's design note, in plan order, one gate per task | That task's builder only: tasks already approved build while the next design is reviewed |
 | `/build auto` | The whole plan **and** every task's design note, once | The first wave |
 
 ## Step Checkpoints
@@ -31,7 +32,7 @@ A checkpoint is lighter than the gate: no catch-up summary and no record. The ga
 
 **Jev shadow check** (`../hooks/JEV-SHADOW.md`). Once per session, run `bash [plugin-root]/hooks/jev.sh status`; if it prints `enabled=false`, skip this for the rest of the session. Otherwise, at a design-step checkpoint (not an investigation), before asking, pipe the step's text to `bash [plugin-root]/hooks/jev.sh checkpoint - --step "N/M <name>" --story [story-id]` (add `--task [task-id]` at task scope). If it printed `jev=<id>`, then after the reply run `jev.sh outcome <id> decision` when the checkpoint asked a decision brief or the reply changed the step, otherwise `jev.sh outcome <id> none`. `jev=skipped` means do nothing more. Never let the answer change the checkpoint: ask exactly what this section says.
 
-A checkpoint holds the user's attention, so it needs the main thread. Subagents can read, investigate, and critique between checkpoints, but the main thread writes each design step.
+A checkpoint holds the user's attention, so it needs the main thread. Subagents can read, investigate, and critique between checkpoints, but the main thread writes each design step. The one exception is the `/build` pipeline: subagents draft every task's `## Design` ahead of time, and each checkpoint then shows the drafted step instead of a freshly written one. The user confirms or edits it, and the main thread writes any edit. A draft is only a proposal; nothing in it is approved until the gate records it.
 
 ## The Three Steps
 
@@ -91,7 +92,7 @@ Continue only on an explicit go-ahead. A hedged reply ("looks fine I guess") is 
 3. Submit it with a write of the slug to `xd://propose`. omp opens its Plan Review: an approval (`keep` is the one that keeps this conversation's context) is the explicit go-ahead. `refine` carries the user's feedback: revise the artifact and the summary, and run the gate again. A dismissed review is not a go-ahead.
 4. After an approval, plan mode is off again: record the go-ahead (below), then continue with the next step.
 
-Batch mode (`/build auto`, "don't stop") passes one plan-mode review over all of its notes. Hosts without plan mode (Claude Code without it, Gemini, Codex) take the go-ahead as an answer to the closing "Proceed?" question.
+Batch mode (`/build auto`, "don't stop") passes one plan-mode review over all of its notes. The `/build` pipeline is not batch mode: each task keeps its checkpoints and its own plan-mode review, and only the builds overlap the reviews. Hosts without plan mode (Claude Code without it, Gemini, Codex) take the go-ahead as an answer to the closing "Proceed?" question.
 
 **Record it.** Every gate records its go-ahead where a script can check it, so a later step reads the record instead of trusting the conversation. Record only after the explicit go-ahead, never to make a phase advance:
 
@@ -112,7 +113,7 @@ Tasks kept in an external tracker have no task note, so `approve` and `approved`
 
 ## Rules That Can't Be Skipped
 
-- **Nothing is built on an unapproved design.** Before any build, the orchestrator checks that `work-state.sh phase` reports `build` and runs `work-state.sh approved`. The `task-builder` checks `approved` again, and reports `blocked` on a non-zero exit.
+- **Nothing is built on an unapproved design.** Before any build, the orchestrator checks that `work-state.sh phase` reports `build` and that `work-state.sh approved` exits 0 for the task (`work-state.sh ready` lists only such tasks). The `task-builder` checks `approved` again, and reports `blocked` on a non-zero exit.
 - **Existing work gets a gate too.** If code or commits already exist for a task that isn't approved (built in an earlier session, by hand, or before these rules), don't continue straight to review, push, PR, merge, or a tracker comment. First write the design note describing what was built and what should change, then run the gate on it, with the approach question if another approach was possible.
 - **"Don't stop" means batch, not skip.** When the user says "just build it", "don't stop", or "no questions", don't drop the design. Switch to batch mode instead: skip the step checkpoints, draft every missing note in one pass (subagents may draft), run one gate over all of them (a combined summary plus every note), record `approve-phase [story-id] plan` and `approve` each task, then build without further stops. `/build auto` works this way.
 - **Stories from before approvals were recorded.** For a planned story (a spec, a plan, and task notes) with no recorded approval, `phase` prints `approvals=missing run: work-state.sh adopt-approvals [story-id]` and reports `spec`. It means the earlier gates ran without leaving a record. Ask the user whether those gates passed. Only on a yes, run the command once: it records the spec, design, and plan as they are now, and re-records every task approval whose design is unchanged. Never run it to get past a gate that didn't happen.

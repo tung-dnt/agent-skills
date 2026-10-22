@@ -49,5 +49,5 @@ next: <recommended next action, or "none">
 ## Composition
 
 - **Invoke directly when:** never; it needs a task that an orchestrator has claimed and whose design the user approved.
-- **Invoke via:** `/task` step 6 and `/build` (one per claimed task; `/build auto` launches a wave of them in parallel).
+- **Invoke via:** `/task` step 6 and `/build` (one per claimed task; the `/build` pipeline starts each in the background as its design is approved, and `/build auto` launches a wave of them in parallel).
 - **Do not invoke from another persona.** Report `blocked`, `failed`, or `needs-command` instead; the orchestrator decides what runs next. See [docs/agents.md](../docs/agents.md).

@@ -7,7 +7,7 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 > **This is a fork** of [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills), maintained at [tung-dnt/agent-skills](https://github.com/tung-dnt/agent-skills). It adds:
 > - design skills (`high-level-design`, `low-level-design`) that give each scope of work (epic, story, task) its own workflow
 > - task notes in the Obsidian project-manager format, safe for parallel sessions, with git-lock claims and `/resume` after a closed session
-> - a multi-agent `/build auto` that routes each piece of work to the cheapest model tier that can do it well
+> - a multi-agent `/build` pipeline (builds start while you review the next design) and `/build auto`, which route each piece of work to the cheapest model tier that can do it well
 >
 > See [What this fork adds](#what-this-fork-adds).
 
@@ -39,7 +39,7 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 | Stress-test a plan or decision | `/grill-me` | Settle every branch before acting |
 | Define what to build | `/spec` | Spec before code |
 | Plan how to build it | `/plan` | Small, atomic tasks |
-| Build incrementally | `/build` | One slice at a time |
+| Build incrementally | `/build` | Builds start while you review the next design |
 | Pick up after a closed session | `/resume` | State lives in files, not chat |
 | Prove it works | `/test` | Tests are proof |
 | Set the quality bar | `/constraints` | Decide it once, enforce it everywhere |
@@ -50,7 +50,7 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 
 In Claude Code these install as plugin commands. Where a built-in command has the same name, as `/review` does, use the namespaced form: `/agent-skills:review`.
 
-Want fewer manual steps once the spec exists? **`/build auto`** generates the plan and implements every task in a single approved pass — you approve the plan once, then it runs autonomously. It removes the human stepping *between* tasks, not the verification: every task is still test-driven and committed individually, and it pauses on failures or risky steps.
+`/build` on a story with several tasks runs a **pipeline**: you review each task's design in plan order, and a task's builder starts in the background as soon as its design is approved, so builds run while you review the next design. Want fewer manual steps once the spec exists? **`/build auto`** generates the plan and implements every task in a single approved pass — you approve the plan once, then it runs autonomously. It removes the human stepping *between* tasks, not the verification: every task is still test-driven and committed individually, and it pauses on failures or risky steps.
 
 Skills also activate automatically based on what you're doing — designing an API triggers `api-and-interface-design`, building UI triggers `frontend-ui-engineering`, and so on.
 
@@ -107,24 +107,25 @@ flowchart TD
 3. **In omp, a plan-mode review:** the agent asks you to turn plan mode on (Alt+Shift+P), submits the phase to omp's Plan Review, and your approval there (`keep`) is the go-ahead. `refine` sends it back with your feedback. Other hosts take the go-ahead as an answer to "Proceed?".
 4. The go-ahead is **recorded** with `approve` / `approve-phase`.
 
-Before the gate, `/story` and `/task` stop at a **step checkpoint** after the investigation and after every design step, so you approve the design piece by piece. `/build auto` and "don't stop" skip the checkpoints and pass one gate over every task design.
+Before the gate, `/story` and `/task` stop at a **step checkpoint** after the investigation and after every design step, so you approve the design piece by piece. `/build auto` and "don't stop" skip the checkpoints and pass one gate over every task design. The `/build` pipeline keeps every checkpoint and gate and overlaps them with the builds: the designs are drafted in parallel up front, and each one still gets your confirmation step by step.
 
 **What makes the tasks reliable:**
 - **No building on a draft.** `phase` advances only on a recorded approval of an unchanged file. Editing an approved spec, design, or plan voids its approval.
 - **No building on a stale contract.** Changing a contract voids every task design that cites it; `work-state.sh cites STORY C3` lists them so each goes through its gate again.
 - **Checked twice.** The orchestrator runs `approved` before starting a builder, and the builder runs it again; if it fails, the builder reports `blocked`.
 - **One owner per task.** The claim is a git lock (see below), so no two sessions, worktrees, or machines take the same task.
-- **Safe parallel waves.** `/build auto` never puts two tasks that touch the same files in one wave; each task gets its own worktree.
+- **Safe parallel builds.** `/build` and `/build auto` start a task only when `work-state.sh ready` lists it: its design approved and unchanged, its dependencies done, and no file in common with a running task (lockfiles and generated outputs count). Each task gets its own worktree.
 - **Builder limits.** Test-first, commits only its own paths, never changes a shared contract, and stops with `blocked`, `failed`, or `needs-command` instead of guessing.
 - **`done` means reviewed.** A task whose acceptance criteria pass goes to `review`; it is `done` only after code review (plus security review for auth or personal data) passes.
 - **Resumable.** Status, `## Log` lines, claims, and worktrees are on disk; `/resume` rebuilds where each task stopped.
+- **Fresh sessions at boundaries.** After each `/story` gate and each build wave, the session logs what is next, names the exact next command, and recommends continuing in a new session: orchestrator sessions measured a 364–395k-token median context, and nothing the next step needs lives in it ([references/model-routing.md](references/model-routing.md)).
 - **Measured before trusted.** An optional [Jev shadow pilot](hooks/JEV-SHADOW.md) logs TypeSafe Jev's answer at each checkpoint and scope check next to what actually happened, without acting on it, so a threshold for skipping checkpoints can be set from data (`jev.sh report`).
 
 **Known weak spots:** a story stops about 13 times before planning and about 7 times per task, plus a keypress per plan-mode review; plan mode can only be turned on by you; an epic's approval lives only in its `summary.md`.
 
 ### Work state, parallel sessions, and `/build auto`
 
-Story and task notes live in your Obsidian vault (or `docs/stories` in the repo), claims are git locks so parallel sessions and machines never take the same task, `/resume` rebuilds where work stopped, and `/build auto` runs task builders in parallel worktrees on the cheapest model tier that can do the job. Details: **[docs/work-state-and-parallel-builds.md](docs/work-state-and-parallel-builds.md)** and [references/work-artifacts.md](references/work-artifacts.md).
+Story and task notes live in your Obsidian vault (or `docs/stories` in the repo), claims are git locks so parallel sessions and machines never take the same task, `/resume` rebuilds where work stopped, `work-state.sh ready` lists the tasks that can build together, `/build` starts each task's builder as its design is approved, and `/build auto` runs the whole plan after one approval, with task builders in parallel worktrees on the cheapest model tier that can do the job. Details: **[docs/work-state-and-parallel-builds.md](docs/work-state-and-parallel-builds.md)** and [references/work-artifacts.md](references/work-artifacts.md).
 
 ---
 

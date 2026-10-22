@@ -104,6 +104,8 @@ Each task follows this structure, whether it lands in its own task note or as an
 **Estimated scope:** [Small: 1-2 files | Medium: 3-5 files | Large: 5+ files]
 ```
 
+List every file the task creates or changes under **Files likely touched**, one backticked path per item, generated files and lockfiles included: `work-state.sh ready` reads that list (and the backticked paths in the task's `## Design`) to keep tasks that share a file out of the same wave.
+
 Don't write the task's internal design here. Just before a task is implemented, its low-level design note is added to the task note with the `low-level-design` skill.
 
 ### Step 5: Order and Checkpoint
@@ -227,7 +229,7 @@ When tasks live in an external tracker, the Task Index lists tracker item IDs or
 
 When multiple agents or sessions are available:
 
-- **How:** each session claims a task using the protocol in `../../references/work-artifacts.md`, so two sessions never take the same task or write the same file. Within one session, `/build auto` fans independent tasks out to parallel builder subagents, following `../../references/model-routing.md`.
+- **How:** each session claims a task using the protocol in `../../references/work-artifacts.md`, so two sessions never take the same task or write the same file. Within one session, `/build` and `/build auto` fan independent tasks out to parallel builder subagents (`work-state.sh ready` lists the ones that can start together), following `../../references/model-routing.md`.
 - **Safe to parallelize:** Independent feature slices, tests for already-implemented features, documentation
 - **Must be sequential:** Database migrations, shared state changes, dependency chains
 - **Needs coordination:** Features that share an API contract (define the contract first, then parallelize)

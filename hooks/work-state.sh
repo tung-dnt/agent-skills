@@ -18,6 +18,10 @@
 #   work-state.sh set STORY TASK STATUS       todo | in-progress | blocked | review | done | cancelled
 #   work-state.sh log STORY TASK TEXT         append a dated line to the task's ## Log
 #   work-state.sh next [STORY-ID]             first claimable task: "story/task" (exit 4 if none)
+#   work-state.sh ready STORY                 every task that can start now, "story/task" per line in plan
+#                                             order: todo, unclaimed, design approved, dependencies complete,
+#                                             and no file shared with a running task or an earlier line;
+#                                             "skipped:" lines on stderr say which task held one back (exit 4 if none)
 #   work-state.sh claim STORY TASK [WORK]     take the lock, then mark the task in-progress;
 #                                             exit 3 if another session holds it,
 #                                             exit 5 if the claim couldn't be published
@@ -53,6 +57,10 @@ USER_CONFIG="${AGENT_SKILLS_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/agent-skil
 DOTPM_SETTINGS=".obsidian/plugins/project-manager/data.json"
 NS="claim"
 STATUSES="todo in-progress blocked review done cancelled"
+# Files that building a task regenerates as a side effect: a lockfile, a schema
+# dump, generated queriers. Two tasks that both touch a file matching the same
+# pattern share it even when their paths differ. `ready` applies this.
+SHARED_OUTPUTS="*.lock package-lock.json npm-shrinkwrap.json pnpm-lock.yaml bun.lockb go.sum schema.sql structure.sql schema.rb *querier.go"
 
 die() { echo "work-state: $*" >&2; exit 1; }
 
@@ -631,6 +639,245 @@ cmd_next() {
     done
   done
   exit 4
+}
+
+# ── ready: every task a wave can start now ───────────────────────────────────
+#
+# `next` offers the first task that can start; `ready` offers all that can start
+# together. A task is listed when it is todo and unclaimed, its design approval
+# holds (`approved` exits 0), every dependency is complete as `next` counts it,
+# and it shares no file with a task that is claimed, in progress, in review, or
+# blocked, or with a task listed before it. A task's files come from its note:
+# the "Files" block of its description (the Step 4 structure of
+# planning-and-task-breakdown, above `## Design`) and the paths written in
+# backticks in `## Design`.
+
+# Task ids on stdin in plan order: by the number after the leading "t" (so t2
+# comes before t10, which a plain sort gets wrong), then by the rest of the id.
+# An id without one sorts last. The order doesn't depend on the locale.
+plan_order() {
+  awk '{
+    n = 999999999; r = $0
+    if (match($0, /^[tT][0-9]+/)) { n = substr($0, 2, RLENGTH - 1) + 0; r = substr($0, RLENGTH + 1) }
+    printf "%09d\t%s\t%s\n", n, r, $0 }' | LC_ALL=C sort | cut -f3
+}
+
+# The files the task note on stdin says it touches, as "TAG<TAB>OWNER<TAB>PATH"
+# lines: every path in the "Files" block of its description, and every path
+# written in backticks in its `## Design`.
+#  - The block opens at a line that starts with "Files" and runs to a colon
+#    (`**Files likely touched:**`, `Files: …`, in a list or not), and ends at the
+#    next blank line (blank lines right after the label don't end it), heading,
+#    or bold label (`**Estimated scope:**`).
+#  - In the block, everything in backticks counts. A line without backticks gives
+#    the first word of each comma-separated piece, or of its list item, that
+#    reads as a path.
+#  - In the design, only a backticked token that reads as a file counts: a path
+#    with an extension, a directory ending in "/", a glob, or a bare file name
+#    with a known extension. Code such as `router.query` is not a file.
+# A path loses its "./" and a trailing ":12" or "#L12".
+task_files() {
+  TAG="$1" OWNER="$2" awk '
+    BEGIN {
+      tag = ENVIRON["TAG"]; owner = ENVIRON["OWNER"]
+      ne = split("ts tsx js jsx mjs cjs json jsonc md mdx sql go py rb rs java kt kts swift sh bash zsh yml yaml toml css scss sass less html htm vue svelte gql graphql proto lock sum mod txt xml csv tf tfvars hcl env ini cfg conf gradle properties php cs c h cpp hpp lua ex exs erl hs scala dart svg png jpg jpeg gif ico snap", e, " ")
+      for (i = 1; i <= ne; i++) ext[e[i]] = 1
+      ne = split("Makefile Dockerfile Gemfile Rakefile Procfile Jenkinsfile Vagrantfile .env .gitignore .npmrc .nvmrc .dockerignore .editorconfig", e, " ")
+      for (i = 1; i <= ne; i++) special[e[i]] = 1
+    }
+    function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
+    function first(s,   i) { s = trim(s); i = match(s, /[[:space:]]/); return i ? substr(s, 1, i - 1) : s }
+    function clean(t) {
+      t = trim(t)
+      while (substr(t, 1, 2) == "./") t = substr(t, 3)
+      sub(/:[0-9]+([-:][0-9]+)*$/, "", t)
+      sub(/#L[0-9]+(-L?[0-9]+)?$/, "", t)
+      return t
+    }
+    function add(t) {
+      t = clean(t)
+      if (t == "" || length(t) > 200 || t ~ /[[:space:]]/ || index(t, "://")) return
+      if (!(t in seen)) { seen[t] = 1; paths[++np] = t }
+    }
+    function pathlike(t,   base, x) {
+      t = clean(t)
+      if (t == "" || length(t) > 200 || t ~ /[[:space:]]/ || index(t, "://")) return 0
+      if (t ~ /[=,;\047"$|&!#%^\\(){}]/) return 0
+      base = t; sub(/^.*\//, "", base)
+      if (index(t, "/")) return (substr(t, length(t)) == "/" || index(t, "*") > 0 || base ~ /\.[A-Za-z0-9]+$/)
+      if (base in special) return 1
+      if (base !~ /^[A-Za-z0-9_@~<>*-][A-Za-z0-9_@.~<>*-]*\.[A-Za-z0-9]+$/) return 0
+      x = tolower(base); sub(/^.*\./, "", x)
+      return (x in ext)
+    }
+    function ticks(s, strict,   i, j, t, c) {
+      c = 0
+      while ((i = index(s, "`")) > 0) {
+        s = substr(s, i + 1)
+        j = index(s, "`")
+        if (j == 0) break
+        t = substr(s, 1, j - 1); s = substr(s, j + 1)
+        c++
+        if (!strict || pathlike(t)) add(t)
+      }
+      return c
+    }
+    function bare(w) {
+      w = trim(w)
+      if (length(w) > 4 && substr(w, 1, 2) == "**" && substr(w, length(w) - 1) == "**") w = substr(w, 3, length(w) - 4)
+      while (w != "" && index("([<\"\047", substr(w, 1, 1))) w = substr(w, 2)
+      while (w != "" && index(")]>\"\047,;:.", substr(w, length(w), 1))) w = substr(w, 1, length(w) - 1)
+      return w
+    }
+    function fileword(w) {
+      w = bare(w)
+      if (index(w, "/")) return (w !~ /[=;\047"$|&!#%^\\(){}]/ && !index(w, "://"))
+      return pathlike(w)
+    }
+    function line_paths(s,   item, parts, k, m, w) {
+      if (ticks(s, 0) > 0) return
+      item = s
+      if (sub(/^[[:space:]]*([-*+]|[0-9]+[.)])[[:space:]]+/, "", item)) {
+        w = first(item); if (fileword(w)) add(bare(w))
+        return
+      }
+      m = split(s, parts, ",")
+      for (k = 1; k <= m; k++) { w = first(parts[k]); if (fileword(w)) add(bare(w)) }
+    }
+    function is_files(l) { return l ~ /^[[:space:]]*([-*+][[:space:]]+)?(\*\*|__)?[Ff]iles?([^A-Za-z:*_`][^:*_`]*)?(\*\*|__)?:/ }
+    function is_label(l,   t) {
+      if (l !~ /^[[:space:]]*([-*+][[:space:]]+)?(\*\*|__)[^*_`]+(\*\*|__)?:/) return 0
+      t = l; sub(/^[[:space:]]*([-*+][[:space:]]+)?(\*\*|__)/, "", t); t = substr(t, 1, index(t, ":") - 1)
+      return (index(t, "/") == 0 && index(t, ".") == 0)
+    }
+    NR == 1 && $0 == "---" { infm = 1; next }
+    infm { if ($0 == "---") infm = 0; next }
+    { l = $0; sub(/[[:space:]]+$/, "", l) }
+    l == "## Design" { sect = 1; inf = 0; next }
+    sect && (l ~ /^## / || l ~ /^(Project|Parent): \[\[/) { sect = 2 }
+    sect == 2 { next }
+    sect == 1 { ticks($0, 1); next }
+    is_files(l) {
+      inf = 1; got = 0
+      r = l; sub(/^[^:]*:/, "", r); sub(/^(\*\*|__)/, "", r)
+      if (r ~ /[^[:space:]]/) { got = 1; line_paths(r) }
+      next
+    }
+    !inf { next }
+    l ~ /^[[:space:]]*$/ { if (got) inf = 0; next }
+    l ~ /^#+[[:space:]]/ || is_label(l) { inf = 0; next }
+    { got = 1; line_paths(l) }
+    END { for (i = 1; i <= np; i++) print tag "\t" owner "\t" paths[i] }'
+}
+
+# The first file a candidate (the C lines on stdin) shares with a task that holds
+# files (the B lines), as "overlaps OWNER on FILE"; nothing when there is none.
+# Paths are compared as written, once "./" is dropped. Two overlap when:
+#  - they are equal, or one is the tail of the other at a "/" (notes shorten
+#    paths: `auth.ts` meets `src/auth.ts`);
+#  - one is a directory (ends in "/", or has no extension) that holds the other;
+#  - one is a glob (`*`) that matches the other, or both are globs that could
+#    match one file (the same text before the first "*" and after the last);
+#  - both are files matching one pattern of SHARED_OUTPUTS, whatever their paths.
+file_conflict() {
+  SHARED="$SHARED_OUTPUTS" awk '
+    BEGIN { FS = "\t"; ns = split(ENVIRON["SHARED"], sp, " ") }
+    function re(g,   r, i, c) {
+      r = ""
+      for (i = 1; i <= length(g); i++) {
+        c = substr(g, i, 1)
+        if (c == "*") r = r ".*"
+        else if (index("\\.^$+?(){}|[]", c)) r = r "\\" c
+        else r = r c
+      }
+      return r
+    }
+    function wild(k) { return index(k, "*") > 0 }
+    function head(k) { return substr(k, 1, index(k, "*") - 1) }
+    function foot(k,   i) { for (i = length(k); i >= 1; i--) if (substr(k, i, 1) == "*") return substr(k, i + 1); return k }
+    function rel(x, y) { return x == "" || y == "" || index(x, y) == 1 || index(y, x) == 1 }
+    function relend(x, y,   lx, ly) {
+      lx = length(x); ly = length(y)
+      if (lx >= ly) return substr(x, lx - ly + 1) == y
+      return substr(y, ly - lx + 1) == x
+    }
+    function dir(k) { return substr(k, length(k)) == "/" }
+    function inside(p, d) { return index("/" p, "/" d) > 0 }
+    function tail(a, b) { return length(b) > length(a) && substr(b, length(b) - length(a)) == "/" a }
+    function hit(g, p) {
+      if (dir(p)) return rel(head(g), p)
+      return p ~ ("(^|/)" re(g) "$")
+    }
+    function overlap(a, b) {
+      if (a == b) return 1
+      if (wild(a) && wild(b)) return rel(head(a), head(b)) && relend(foot(a), foot(b))
+      if (wild(a)) return hit(a, b)
+      if (wild(b)) return hit(b, a)
+      if (dir(a) && dir(b)) return inside(a, b) || inside(b, a)
+      if (dir(a)) return inside(b, a)
+      if (dir(b)) return inside(a, b)
+      return tail(a, b) || tail(b, a) || (noext(a) && inside(b, a "/")) || (noext(b) && inside(a, b "/"))
+    }
+    function base(k) { sub(/^.*\//, "", k); return k }
+    function noext(k) { return index(base(k), ".") == 0 }
+    function common(a, b,   s, x, y) {
+      x = base(a); y = base(b)
+      for (s = 1; s <= ns; s++)
+        if (x ~ ("^" re(sp[s]) "$") && y ~ ("^" re(sp[s]) "$")) return sp[s]
+      return ""
+    }
+    $1 == "B" { nb++; bo[nb] = $2; bk[nb] = $3; next }
+    $1 == "C" { nc++; ck[nc] = $3; next }
+    END {
+      for (i = 1; i <= nb; i++)
+        for (j = 1; j <= nc; j++) {
+          if (overlap(ck[j], bk[i])) { print "overlaps " bo[i] " on " ck[j] (ck[j] == bk[i] ? "" : " ~ " bk[i]); exit }
+          p = common(ck[j], bk[i])
+          if (p != "") { print "overlaps " bo[i] " on shared output " p " (" ck[j] ", " bk[i] ")"; exit }
+        }
+    }'
+}
+
+cmd_ready() {
+  local story="${1:-}" f id ref content status dep ok held ids cands="" busy="" cand hit n=0
+  valid_id "$story" || die "usage: work-state.sh ready STORY"
+  resolve
+  [ -d "$STORIES/$story" ] || die "no story '$story' under $STORIES"
+  refresh
+  ids="$(for f in "$STORIES/$story"/_tasks/*.md; do if [ -f "$f" ]; then basename "$f" .md; fi; done | plan_order)"
+  # A task under way holds its files; a todo task nobody holds is a candidate.
+  for id in $ids; do
+    ref="$(claim_ref "$story" "$id")"
+    content="$(task_content "$story" "$id" "$ref")"
+    status="$(printf '%s\n' "$content" | fm status)"
+    held=0
+    if [ -n "$ref" ]; then held=1; fi
+    case "$status" in in-progress|review|blocked) held=1 ;; esac
+    if [ "$held" = 1 ]; then
+      busy="$busy$(printf '%s\n' "$content" | task_files B "$story/$id (running)")
+"
+    elif [ "$status" = todo ]; then
+      cands="$cands $id"
+    fi
+  done
+  for id in $cands; do
+    f="$STORIES/$story/_tasks/$id.md"
+    approval_state "$story" "$id" > /dev/null || continue
+    ok=1
+    for dep in $(deps_of < "$f"); do
+      if ! dep_finished "$story" "$dep"; then ok=0; break; fi
+    done
+    [ "$ok" = 1 ] || continue
+    cand="$(task_files C - < "$f")"
+    hit="$(printf '%s\n%s\n' "$busy" "$cand" | file_conflict)"
+    if [ -n "$hit" ]; then echo "skipped: $story/$id $hit" >&2; continue; fi
+    if [ -z "$cand" ]; then echo "note: $story/$id lists no files, so its overlap with other tasks is unchecked" >&2; fi
+    echo "$story/$id"
+    n=$((n + 1))
+    busy="$busy$(task_files B "$story/$id (ready)" < "$f")
+"
+  done
+  [ "$n" -gt 0 ] || exit 4
 }
 
 # ── creating epics, stories, and tasks ───────────────────────────────────────
@@ -1511,6 +1758,7 @@ case "${1:-}" in
   set) shift; cmd_set "${1:-}" "${2:-}" "${3:-}" ;;
   log) shift; cmd_log "${1:-}" "${2:-}" "${3:-}" ;;
   next) shift; cmd_next "${1:-}" ;;
+  ready) shift; cmd_ready "${1:-}" ;;
   claim) shift; cmd_claim "${1:-}" "${2:-}" "${3:-}" ;;
   release) shift; cmd_release "${1:-}" "${2:-}" ;;
   status) shift; cmd_status "${1:-}" ;;
@@ -1524,5 +1772,5 @@ case "${1:-}" in
   cites) shift; cmd_cites "${1:-}" "${2:-}" ;;
   migrate) shift; cmd_migrate "${1:-}" ;;
   hint) cmd_hint ;;
-  *) die "usage: work-state.sh {root|configure DIR [EPICS_DIR]|init-epic EPIC TITLE|init-story STORY TITLE [EPIC]|new-task STORY TITLE [DEP...]|path STORY [TASK]|field STORY TASK KEY VALUE|set STORY TASK STATUS|log STORY TASK TEXT|next [STORY]|claim STORY TASK [WORK]|release STORY TASK|status [STORY]|brief STORY TASK|phase STORY|approve STORY TASK|approved STORY TASK|approve-phase STORY PHASE|approved-phase STORY PHASE|adopt-approvals STORY|cites STORY ID|migrate [STORY]|hint}" ;;
+  *) die "usage: work-state.sh {root|configure DIR [EPICS_DIR]|init-epic EPIC TITLE|init-story STORY TITLE [EPIC]|new-task STORY TITLE [DEP...]|path STORY [TASK]|field STORY TASK KEY VALUE|set STORY TASK STATUS|log STORY TASK TEXT|next [STORY]|ready STORY|claim STORY TASK [WORK]|release STORY TASK|status [STORY]|brief STORY TASK|phase STORY|approve STORY TASK|approved STORY TASK|approve-phase STORY PHASE|approved-phase STORY PHASE|adopt-approvals STORY|cites STORY ID|migrate [STORY]|hint}" ;;
 esac
