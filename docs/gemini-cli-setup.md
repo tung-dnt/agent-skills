@@ -107,23 +107,20 @@ This is useful when you want to ensure a specific workflow is followed without w
 
 ## Slash Commands
 
-The repo ships 9 slash commands under `.gemini/commands/`: 8 lifecycle commands plus the `/webperf` specialist audit. Gemini CLI auto-discovers them when you run from the project root.
+In this fork the lifecycle commands (`/spec`, `/plan`, `/build`, `/epic`, `/story`, `/task`, and the rest) ship only in Claude-command format under `.claude/commands/`, used by omp. Gemini CLI does not load them. Invoke the skills by name instead:
 
-| Command | What it does |
-|---------|--------------|
-| `/spec` | Write a structured spec before writing code |
-| `/constraints` | Define and enforce the project's quality bar |
-| `/planning` | Break work into small, verifiable tasks |
-| `/build` | Implement the next task incrementally |
-| `/test` | Run TDD workflow — red, green, refactor |
-| `/review` | Five-axis code review |
-| `/code-simplify` | Reduce complexity without changing behavior |
-| `/ship` | Pre-launch checklist via parallel persona fan-out |
-| `/webperf` | Audit browser-facing apps for Core Web Vitals and performance issues |
+| Intent | Skill to invoke |
+|--------|-----------------|
+| Write a structured spec before writing code | `spec-driven-development` |
+| Define and enforce the project's quality bar | `constraint-driven-development` |
+| Break work into small, verifiable tasks | `planning-and-task-breakdown` |
+| Implement the next task incrementally | `incremental-implementation` |
+| Run TDD workflow — red, green, refactor | `test-driven-development` |
+| Five-axis code review | `code-review-and-quality` |
+| Reduce complexity without changing behavior | `code-simplification` |
+| Pre-launch checklist | `shipping-and-launch` |
 
-Each command invokes the corresponding skill automatically — no manual skill loading required.
-
-> **Note:** Use `/planning` instead of `/plan` — `/plan` conflicts with a Gemini CLI internal command name.
+For a performance audit, use the `web-performance-auditor` agent.
 
 ## Usage Tips
 

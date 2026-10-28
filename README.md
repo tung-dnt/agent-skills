@@ -60,7 +60,7 @@ Skills also activate automatically based on what you're doing — designing an A
 
 ### A workflow for each scope of work
 
-`/epic`, `/story`, and `/task` run these workflows. Every planning phase ends in a recorded approval, and nothing is built until `work-state.sh` confirms that approval still matches the files. They work with or without a tracker: a ticket key or URL is read as input, and without a tracker the repository's folders are the tracker.
+`/epic`, `/story`, and `/task` run these workflows. Every planning phase ends in a recorded approval, and nothing is built until `work_state` confirms that approval still matches the files. They work with or without a tracker: a ticket key or URL is read as input, and without a tracker the repository's folders are the tracker.
 
 ```mermaid
 flowchart TD
@@ -69,19 +69,19 @@ flowchart TD
     SC -->|story| S1
     SC -->|task| T0[/task: one-task story/]
     E --> S1
-    subgraph Story ["/story — resumes at the phase work-state.sh reports"]
-      S1[Spec: FR/NFR + testable AC] --> G1{Gate → plan-mode review<br/>approve-phase spec}
-      G1 --> S2[High-level design: 11 steps, checkpoint after each<br/>shared contracts C1…]
-      S2 --> G2{Fresh-context review → gate → plan-mode review<br/>approve-phase design}
+    subgraph Story ["/story — resumes at the phase `work_state` reports"]
+      S1[Spec: FR/NFR + testable AC] --> G1{Show result → ask approval<br/>approve-phase spec}
+      G1 --> S2[High-level design: 11 steps, checkpoints after 1, 5, 9<br/>shared contracts C1…]
+      S2 --> G2{Fresh-context review → show result → ask approval<br/>approve-phase design}
       G2 --> S3[Plan: plan.md + one task note per task]
-      S3 --> G3{Gate → plan-mode review<br/>approve-phase plan}
+      S3 --> G3{Show result → ask approval<br/>approve-phase plan}
     end
     G3 --> T1
     T0 --> T1
     subgraph Task ["/task or /build — once per task"]
       T1[next → claim lock] --> T2[Investigate: bugs only, checkpoint]
-      T2 --> T3[Low-level design: 6 steps, checkpoint after each]
-      T3 --> G4{Gate → plan-mode review<br/>approve task}
+      T2 --> T3[Low-level design: 6 steps, checkpoint after step 1]
+      T3 --> G4{Show result → ask approval<br/>approve task}
       G4 --> T4[task-builder: rechecks approval, builds test-first<br/>→ status review]
       T4 --> T5[code-reviewer + security-auditor when it applies]
       T5 -->|Critical/Important| T4
@@ -104,28 +104,30 @@ flowchart TD
 **Every gate** ([references/approval-gate.md](references/approval-gate.md)):
 1. A one-screen **catch-up summary** (Business context · Proposed fix fit · Root cause for bugs · Recommendation · Open decisions), saved to `[stories-dir]/[story-id]/summary.md` or the task note's `## Summary`.
 2. **`grill-me` rounds** until nothing is open; each round is one `ask` dialog.
-3. **In omp, a plan-mode review:** the agent asks you to turn plan mode on (Alt+Shift+P), submits the phase to omp's Plan Review, and your approval there (`keep`) is the go-ahead. `refine` sends it back with your feedback. Other hosts take the go-ahead as an answer to "Proceed?".
+3. **Show the result, then ask for approval in the same chat:** in omp, the agent shows the phase result and artifact path (plus a task's design verbatim), then opens an `ask` dialog with Proceed / Revise. No plan-mode toggle or Plan Review submission is required. Other hosts use their available question mechanism.
 4. The go-ahead is **recorded** with `approve` / `approve-phase`.
 
-Before the gate, `/story` and `/task` stop at a **step checkpoint** after the investigation and after every design step, so you approve the design piece by piece. `/build auto` and "don't stop" skip the checkpoints and pass one gate over every task design. The `/build` pipeline keeps every checkpoint and gate and overlaps them with the builds: the designs are drafted in parallel up front, and each one still gets your confirmation step by step.
+Before the gate, `/story` and `/task` stop at a **step checkpoint** after the investigation and at a few design checkpoints (three in a story's design, one in a task's), so you steer the design before the gate. `/build auto` and "don't stop" skip the checkpoints and pass one gate over every task design. The `/build` pipeline keeps every checkpoint and gate and overlaps them with the builds: the designs are drafted in parallel up front, and each one still gets its checkpoint and gate. On a large story (more than about five tasks, or several repos) it uses **slice gates** instead: one gate per repo-sized slice, showing every task design in it, then each task is approved on its own record.
 
 **What makes the tasks reliable:**
 - **No building on a draft.** `phase` advances only on a recorded approval of an unchanged file. Editing an approved spec, design, or plan voids its approval.
-- **No building on a stale contract.** Changing a contract voids every task design that cites it; `work-state.sh cites STORY C3` lists them so each goes through its gate again.
+- **No building on a stale contract.** Changing a contract voids every task design that cites it; `work_state cites STORY C3` lists them so each goes through its gate again.
 - **Checked twice.** The orchestrator runs `approved` before starting a builder, and the builder runs it again; if it fails, the builder reports `blocked`.
 - **One owner per task.** The claim is a git lock (see below), so no two sessions, worktrees, or machines take the same task.
-- **Safe parallel builds.** `/build` and `/build auto` start a task only when `work-state.sh ready` lists it: its design approved and unchanged, its dependencies done, and no file in common with a running task (lockfiles and generated outputs count). Each task gets its own worktree.
+- **Safe parallel builds.** `/build` and `/build auto` start a task only when `work_state ready` lists it: its design approved and unchanged, its dependencies done, and no file in common with a running task (lockfiles and generated outputs count). Each task gets its own worktree.
 - **Builder limits.** Test-first, commits only its own paths, never changes a shared contract, and stops with `blocked`, `failed`, or `needs-command` instead of guessing.
 - **`done` means reviewed.** A task whose acceptance criteria pass goes to `review`; it is `done` only after code review (plus security review for auth or personal data) passes.
 - **Resumable.** Status, `## Log` lines, claims, and worktrees are on disk; `/resume` rebuilds where each task stopped.
 - **Fresh sessions at boundaries.** After each `/story` gate and each build wave, the session logs what is next, names the exact next command, and recommends continuing in a new session: orchestrator sessions measured a 364–395k-token median context, and nothing the next step needs lives in it ([references/model-routing.md](references/model-routing.md)).
 - **Measured before trusted.** An optional [Jev shadow pilot](hooks/JEV-SHADOW.md) logs TypeSafe Jev's answer at each checkpoint and scope check next to what actually happened, without acting on it, so a threshold for skipping checkpoints can be set from data (`jev.sh report`).
 
-**Known weak spots:** a story stops about 13 times before planning and about 7 times per task, plus a keypress per plan-mode review; plan mode can only be turned on by you; an epic's approval lives only in its `summary.md`.
+**Stops:** a story stops 6 times before building (spec gate, three design checkpoints, design gate, plan gate) and twice per task (one design checkpoint, then the gate), or once per slice on a large story. `approve` refuses a task design over 15 lines unless you chose to keep the task whole (`--allow-long`). **Known weak spot:** an epic's approval lives only in its `summary.md`.
 
 ### Work state, parallel sessions, and `/build auto`
 
-Story and task notes live in your Obsidian vault (or `docs/stories` in the repo), claims are git locks so parallel sessions and machines never take the same task, `/resume` rebuilds where work stopped, `work-state.sh ready` lists the tasks that can build together, `/build` starts each task's builder as its design is approved, and `/build auto` runs the whole plan after one approval, with task builders in parallel worktrees on the cheapest model tier that can do the job. Details: **[docs/work-state-and-parallel-builds.md](docs/work-state-and-parallel-builds.md)** and [references/work-artifacts.md](references/work-artifacts.md).
+**Requires omp.** The `/epic`, `/story`, `/task`, `/build` and `/resume` workflows run on the `work_state` tool, which this plugin registers through its omp extension (`package.json` → `omp/index.ts`). Install with `omp plugin install agent-skills@tung-agent-skills` and restart the session. On other hosts the skills still work by name, but these workflows don't.
+
+Story and task notes live in your Obsidian vault (or `docs/stories` in the repo), claims are git locks so parallel sessions and machines never take the same task, `/resume` rebuilds where work stopped, `work_state ready` lists the tasks that can build together, `/build` starts each task's builder as its design is approved, and `/build auto` runs the whole plan after one approval, with task builders in parallel worktrees on the cheapest model tier that can do the job. Details: **[docs/work-state-and-parallel-builds.md](docs/work-state-and-parallel-builds.md)** and [references/work-artifacts.md](references/work-artifacts.md).
 
 ---
 
@@ -142,14 +144,14 @@ Or grab individual skills:
 
 ```bash
 npx skills add tung-dnt/agent-skills --skill code-review-and-quality   # five-axis review before merge
-npx skills add tung-dnt/agent-skills --skill interview-me              # requirements interrogation, one question at a time
+npx skills add tung-dnt/agent-skills --skill interview-me              # requirements interrogation in short rounds of guessed questions
 npx skills add tung-dnt/agent-skills --skill test-driven-development   # red-green-refactor, enforced
 ```
 
 > **Installing one skill?** A per-skill `npx` install copies only
 > `skills/<name>/`, not the repo-level `references/` directory. The skill still
 > works, but paths to supplementary shared checklists are unavailable, and so is
-> `hooks/work-state.sh` (the reference describes the manual git fallback). Use a
+> the `work_state` tool (the reference describes the manual git fallback). Use a
 > whole-repo integration, clone the repository, or copy the needed checklist into
 > a `references/` directory inside the installed skill. This portability gap is
 > tracked in [#361](https://github.com/addyosmani/agent-skills/issues/361).

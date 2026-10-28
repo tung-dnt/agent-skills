@@ -21,7 +21,7 @@ Write a structured specification before writing any code. The spec is the shared
 
 ## The Gated Workflow
 
-Spec-driven development has four phases, preceded by a scope check (Phase 0) that activates only when one request bundles several independently testable capabilities. Do not advance to the next phase until the current one is validated. Each validation is the approval gate in `../../references/approval-gate.md`: a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead. For a story, each go-ahead is recorded with `work-state.sh approve-phase [story-id] spec`, then `design` and `plan` at their gates; `work-state.sh phase` advances only on those records.
+Spec-driven development has four phases, preceded by a scope check (Phase 0) that activates only when one request bundles several independently testable capabilities. Do not advance to the next phase until the current one is validated. Each validation is the approval gate in `../../references/approval-gate.md`: a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead. For a story, each go-ahead is recorded with `work_state approve-phase [story-id] spec`, then `design` and `plan` at their gates; `work_state phase` advances only on those records.
 
 ```
 SPECIFY ──→ PLAN ──→ TASKS ──→ IMPLEMENT
@@ -112,7 +112,7 @@ Don't silently fill in ambiguous requirements. The spec's entire purpose is to s
    - **Ask first:** Database schema changes, adding dependencies, changing CI config
    - **Never do:** Commit secrets, edit vendor directories, remove failing tests without approval
 
-**Where the spec goes:** a spec for the whole project (or a capability map) is `SPEC.md` at the project root. A spec for one story or feature is `[stories-dir]/[story-id]/spec.md` (`docs/stories/[story-id]/spec.md` in the repo store; the directory comes from `work-state.sh root`, and may be inside an Obsidian vault), so its plan and task notes sit beside it and several stories can be in flight at once (see `../../references/work-artifacts.md`).
+**Where the spec goes:** a spec for the whole project (or a capability map) is `SPEC.md` at the project root. A spec for one story or feature is `[stories-dir]/[story-id]/spec.md` (`docs/stories/[story-id]/spec.md` in the repo store; the directory comes from `work_state root`, and may be inside an Obsidian vault), so its plan and task notes sit beside it and several stories can be in flight at once (see `../../references/work-artifacts.md`).
 
 **Spec template:**
 
@@ -174,7 +174,7 @@ This lets you loop, retry, and problem-solve toward a clear goal rather than gue
 **Stop after writing the spec (CRITICAL).** Once the spec is saved:
 
 1. Summarize it and list any Open Questions.
-2. Ask the human to approve it or request changes through the approval gate (`../../references/approval-gate.md`): in omp, that is the plan-mode review.
+2. Show the spec result in chat, then ask the human to approve it or request changes through the approval gate (`../../references/approval-gate.md`): in omp, use the `ask` dialog without entering plan mode.
 3. **STOP YOUR TURN IMMEDIATELY.** Do NOT start Phase 2, invoke `planning-and-task-breakdown`, or write code in this turn. Planning starts only after the human approves the spec in a later turn.
 
 ### Phase 2: Plan
@@ -191,7 +191,7 @@ With the validated spec, generate a technical implementation plan:
 
 > Follow `planning-and-task-breakdown` for the dependency-graph mapping and vertical-slicing mechanics behind these steps; it is the canonical source. The bullets above are a lightweight summary; if they ever diverge, `planning-and-task-breakdown` takes precedence.
 >
-> **Output convention:** Save the plan to `[stories-dir]/[story-id]/plan.md` and record the tasks in the task list target defined by `planning-and-task-breakdown` (default: one note per task under `[stories-dir]/[story-id]/_tasks/`, created with `work-state.sh new-task`; projects may designate an external tracker instead). Downstream commands (`/build`, etc.) expect these defaults. Once the task notes exist and the user has approved the plan, record it with `work-state.sh approve-phase [story-id] plan`.
+> **Output convention:** Save the plan to `[stories-dir]/[story-id]/plan.md` and record the tasks in the task list target defined by `planning-and-task-breakdown` (default: one note per task under `[stories-dir]/[story-id]/_tasks/`, created with `work_state new-task`; projects may designate an external tracker instead). Downstream commands (`/build`, etc.) expect these defaults. Once the task notes exist and the user has approved the plan, record it with `work_state approve-phase [story-id] plan`.
 
 The plan should be reviewable: the human should be able to read it and say "yes, that's the right approach" or "no, change X."
 
@@ -261,6 +261,6 @@ Before proceeding to implementation, confirm:
 - [ ] Success criteria are specific and testable
 - [ ] Boundaries (Always/Ask First/Never) are defined
 - [ ] The spec is saved to a file (`SPEC.md` for a project, `[stories-dir]/[story-id]/spec.md` for a story)
-- [ ] A story spec numbers its requirements (`FR1`…, `NFR1`…), and the go-ahead is recorded with `work-state.sh approve-phase [story-id] spec`
+- [ ] A story spec numbers its requirements (`FR1`…, `NFR1`…), and the go-ahead is recorded with `work_state approve-phase [story-id] spec`
 - [ ] If the request bundles several independently testable capabilities, a capability map (module ids, dependency direction, build order) was approved before any module spec was written
 - [ ] Every module spec traces to a module id in the approved map

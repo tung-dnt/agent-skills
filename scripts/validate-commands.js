@@ -2,19 +2,12 @@
 /**
  * validate-commands.js
  *
- * Guards against silent drift across the three slash-command directories:
- *   .claude/commands/  (.md — Claude Code)
- *   .gemini/commands/  (.toml — Gemini CLI)
- *   commands/          (.toml — Antigravity CLI)
+ * Guards the slash-command surface of this fork:
+ *   .claude/commands/  (.md — Claude Code format, loaded by omp)
  *
  * Checks (errors block CI):
- *   - Every command present in one directory exists in all three
- *   - The 'description' field is identical across all three equivalents
- *   - Claude command frontmatter is valid YAML, not merely splittable
- *
- * What this does NOT check:
- *   Prompt body differences are intentional — each tool has its own
- *   syntax ($ARGUMENTS, agent-skills: prefixes, GEMINI.md vs CLAUDE.md).
+ *   - Every command has a top-level 'description' in its frontmatter
+ *   - Command frontmatter is valid YAML, not merely splittable
  *
  * Exit codes: 0 = all clear, 1 = one or more errors
  */
@@ -26,185 +19,56 @@ const path = require('path');
 
 // The same frontmatter-validity rules validate-skills applies to SKILL.md.
 // Description extraction shares the top-level frontmatter reader with skills.
-// YAML validity is checked separately because Claude Code parses frontmatter
-// when the command is loaded. The #494 thread verified all 25 SKILL.md files
-// and the command files by hand; this makes the second half a check too.
+// YAML validity is checked separately because the host parses frontmatter
+// when the command is loaded.
 const { frontmatterYamlErrors, parseFrontmatter } = require(path.join(__dirname, 'lib', 'skill-lint.js'));
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const ROOT = path.resolve(__dirname, '..');
-
-const DIRS = {
-  claude:     { dir: path.join(ROOT, '.claude', 'commands'), ext: '.md'   },
-  gemini:     { dir: path.join(ROOT, '.gemini', 'commands'), ext: '.toml' },
-  antigravity:{ dir: path.join(ROOT, 'commands'),            ext: '.toml' },
-};
-
-// Commands where the file stem differs between Claude and the TOML dirs.
-// Key = Claude stem, value = TOML stem.
-const NAME_MAP = {
-  plan: 'planning',
-};
-const NAME_MAP_REVERSE = Object.fromEntries(
-  Object.entries(NAME_MAP).map(([k, v]) => [v, k])
-);
-
-// ─── Parsers ──────────────────────────────────────────────────────────────────
-
-function descriptionFromMd(filePath) {
-  const content = fs.readFileSync(filePath, 'utf8');
-  return parseFrontmatter(content)?.description ?? null;
-}
-
-function descriptionFromToml(filePath) {
-  const content     = fs.readFileSync(filePath, 'utf8');
-  const doubleMatch = content.match(/^description\s*=\s*"((?:[^"\\]|\\.)*)"/m);
-  if (doubleMatch) return doubleMatch[1].replace(/\\"/g, '"');
-  const singleMatch = content.match(/^description\s*=\s*'([^']*)'/m);
-  return singleMatch ? singleMatch[1] : null;
-}
-
-// ─── Loader ───────────────────────────────────────────────────────────────────
-
-function loadCommands({ dir, ext }) {
-  if (!fs.existsSync(dir)) return {};
-  return Object.fromEntries(
-    fs.readdirSync(dir)
-      .filter(f => f.endsWith(ext))
-      .map(f => {
-        const stem = path.basename(f, ext);
-        const full = path.join(dir, f);
-        try {
-          const desc = ext === '.md' ? descriptionFromMd(full) : descriptionFromToml(full);
-          return [stem, desc];
-        } catch (e) {
-          console.log(`  ✗  ${stem} — cannot read file: ${e.message}`);
-          return [stem, null];
-        }
-      })
-  );
-}
+const COMMANDS_DIR = path.join(ROOT, '.claude', 'commands');
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 function main() {
-  const byTool = {
-    claude:      loadCommands(DIRS.claude),
-    gemini:      loadCommands(DIRS.gemini),
-    antigravity: loadCommands(DIRS.antigravity),
-  };
-
-  // Canonical command list: use Claude stems as the reference.
-  // Map each Claude stem to its TOML equivalent for lookup.
-  const claudeStems = Object.keys(byTool.claude).sort();
-  const allTomlStems = new Set([
-    ...Object.keys(byTool.gemini),
-    ...Object.keys(byTool.antigravity),
-  ]);
-  const allCanonicalStems = new Set([
-    ...claudeStems,
-    ...[...allTomlStems].map(s => NAME_MAP_REVERSE[s] ?? s),
-  ]);
+  const stems = fs.existsSync(COMMANDS_DIR)
+    ? fs.readdirSync(COMMANDS_DIR).filter(f => f.endsWith('.md')).map(f => path.basename(f, '.md')).sort()
+    : [];
 
   let errors = 0;
 
-  // ── Parity check ────────────────────────────────────────────────────────────
-  console.log('Checking command parity...');
+  console.log('Checking command descriptions and frontmatter...');
 
-  // Commands in Claude not found in TOML dirs
-  for (const stem of claudeStems) {
-    const tomlStem = NAME_MAP[stem] ?? stem;
-    const missing  = [];
-    if (!(tomlStem in byTool.gemini))      missing.push('.gemini/commands');
-    if (!(tomlStem in byTool.antigravity)) missing.push('commands');
-    if (missing.length) {
-      console.log(`  ✗  ${stem} — missing in: ${missing.join(', ')}`);
-      errors++;
-    } else {
-      console.log(`  ✓  ${stem}${stem !== tomlStem ? ` (${tomlStem} in toml dirs)` : ''}`);
-    }
-  }
-
-  // Commands in TOML dirs not found in Claude
-  for (const stem of [...allTomlStems].sort()) {
-    const claudeStem = NAME_MAP_REVERSE[stem] ?? stem;
-    if (!(claudeStem in byTool.claude)) {
-      console.log(`  ✗  ${stem} — present in toml dirs but missing in .claude/commands`);
-      errors++;
-    }
-  }
-
-  // ── Claude frontmatter validity ─────────────────────────────────────────────
-  // Only the .md directory: the TOML dirs are parsed by a real TOML parser
-  // already, so a malformed one surfaces as a missing description above.
-  console.log('\nChecking Claude command frontmatter...');
-
-  for (const stem of claudeStems) {
-    const full = path.join(DIRS.claude.dir, `${stem}${DIRS.claude.ext}`);
-    let yamlErrors = [];
+  for (const stem of stems) {
+    const full = path.join(COMMANDS_DIR, `${stem}.md`);
+    let content;
     try {
-      yamlErrors = frontmatterYamlErrors(fs.readFileSync(full, 'utf8'));
+      content = fs.readFileSync(full, 'utf8');
     } catch (e) {
       console.log(`  ✗  ${stem} — cannot read file: ${e.message}`);
       errors++;
       continue;
     }
-    if (yamlErrors.length === 0) {
+
+    const problems = [];
+    if (parseFrontmatter(content)?.description == null) {
+      problems.push('.claude/commands/' + stem + ' — missing or malformed description');
+    }
+    problems.push(...frontmatterYamlErrors(content));
+
+    if (problems.length === 0) {
       console.log(`  ✓  ${stem}`);
       continue;
     }
     console.log(`  ✗  ${stem}`);
-    for (const message of yamlErrors) {
+    for (const message of problems) {
       console.log(`       ${message}`);
       errors++;
     }
   }
 
-  // ── Description sync check ──────────────────────────────────────────────────
-  console.log('\nChecking description sync...');
-
-  for (const claudeStem of claudeStems) {
-    const tomlStem   = NAME_MAP[claudeStem] ?? claudeStem;
-    const descClaude = byTool.claude[claudeStem];
-    const descGemini = byTool.gemini[tomlStem];
-    const descAgy    = byTool.antigravity[tomlStem];
-
-    const malformed = [
-      ['.claude/commands', byTool.claude, claudeStem],
-      ['.gemini/commands', byTool.gemini, tomlStem],
-      ['commands/', byTool.antigravity, tomlStem],
-    ].filter(([, commands, stem]) => Object.prototype.hasOwnProperty.call(commands, stem) && commands[stem] == null);
-
-    if (malformed.length) {
-      console.log(`  ✗  ${claudeStem}`);
-      for (const [toolDir, , stem] of malformed) {
-        console.log(`       ${toolDir}/${stem} — missing or malformed description`);
-      }
-      errors++;
-      continue;
-    }
-
-    if (descClaude == null || descGemini == null || descAgy == null) {
-      // Missing file already flagged by parity check
-      continue;
-    }
-
-    const allMatch = descClaude === descGemini && descGemini === descAgy;
-
-    if (allMatch) {
-      console.log(`  ✓  ${claudeStem}`);
-    } else {
-      console.log(`  ✗  ${claudeStem}`);
-      console.log(`       .claude:      ${descClaude}`);
-      console.log(`       .gemini:      ${descGemini}`);
-      console.log(`       commands/:    ${descAgy}`);
-      errors++;
-    }
-  }
-
   const status = errors > 0 ? 'FAILED' : 'PASSED';
-  console.log(`\n${allCanonicalStems.size} commands checked — ${errors} error(s) — ${status}`);
+  console.log(`\n${stems.length} commands checked — ${errors} error(s) — ${status}`);
 
   if (errors > 0) process.exit(1);
 }

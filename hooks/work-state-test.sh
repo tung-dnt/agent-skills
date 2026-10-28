@@ -1,5 +1,5 @@
 #!/bin/bash
-# work-state-test.sh — Tests for hooks/work-state.sh: store resolution (vault
+# work-state-test.sh — Tests for the work_state tool (omp/work-state.ts, run through omp/cli.ts): store resolution (vault
 # or repository), dotpm notes, claiming across sessions, worktrees, and
 # machines, the ticked status tree, recorded approvals (a task's, and a story's
 # spec, design, and plan) with the story phase they drive, migration from the
@@ -13,9 +13,9 @@ set -euo pipefail
 PASS=0 FAIL=0
 TMP=$(cd "$(mktemp -d)" && pwd -P)
 trap 'rm -rf "$TMP"' EXIT
-SCRIPT="$(cd "$(dirname "$0")" && pwd)/work-state.sh"
-# Run under the system bash so bash-4-only syntax fails here (macOS ships 3.2).
-BASH_BIN=/bin/bash
+# The CLI under test: the TypeScript port by default; WORK_STATE_CMD overrides it (words split on
+# spaces), e.g. WORK_STATE_CMD="bun /abs/path/omp/cli.ts".
+if [ -n "${WORK_STATE_CMD:-}" ]; then read -r -a WS_CMD <<< "$WORK_STATE_CMD"; else WS_CMD=(bun "$(cd "$(dirname "$0")/.." && pwd)/omp/cli.ts"); fi
 # No user config unless a test writes one: the repository store.
 export AGENT_SKILLS_CONFIG="$TMP/user-config.json"
 
@@ -25,8 +25,8 @@ has()   { if printf '%s' "$2" | grep -qF -- "$3"; then ok "$1"; else bad "$1" "$
 lacks() { if printf '%s' "$2" | grep -qF -- "$3"; then bad "$1" "$2"; else ok "$1"; fi; }
 is()    { if [ "$2" = "$3" ]; then ok "$1"; else bad "$1" "got:  $2
 want: $3"; fi; }
-ws()    { "$BASH_BIN" "$SCRIPT" "$@" 2>&1 || true; }
-code()  { set +e; "$BASH_BIN" "$SCRIPT" "$@" >/dev/null 2>&1; echo $?; set -e; }
+ws()    { "${WS_CMD[@]}" "$@" 2>&1 || true; }
+code()  { set +e; "${WS_CMD[@]}" "$@" >/dev/null 2>&1; echo $?; set -e; }
 
 git_id() { git config user.email t@example.invalid && git config user.name Test; }
 new_repo() {
@@ -71,7 +71,7 @@ has "notes the legacy single-plan layout" "$out" "legacy single-plan layout: tas
 mkdir -p docs/stories
 has "detects an existing docs/stories" "$(ws root)" "source=detected"
 mkdir -p docs/stories/old/tasks && touch docs/stories/old/tasks/t01-a.md
-has "notes the old task layout" "$(ws root)" "old task layout under docs/stories: run work-state.sh migrate"
+has "notes the old task layout" "$(ws root)" "old task layout under docs/stories: run work_state migrate"
 rm -rf docs/stories/old
 has "configure normalizes ./ and trailing slashes" "$(ws configure ./work/stories/ work/epics)" "storiesDir=work/stories"
 out=$(ws root)
@@ -89,7 +89,7 @@ has "resolves from a subdirectory" "$(ws root)" "stories_dir=$TMP/root/s2"
 
 echo "dotpm notes"
 new_repo notes
-has "new-task needs the story's project note" "$(ws new-task pay 'T01 model')" "run work-state.sh init-story first"
+has "new-task needs the story's project note" "$(ws new-task pay 'T01 model')" "run work_state init-story first"
 has "init-story creates the project note" "$(ws init-story pay 'Payments')" "created: $TMP/notes/docs/stories/pay/pay.md"
 has "init-story is idempotent" "$(ws init-story pay 'Payments')" "exists: "
 proj=$(cat docs/stories/pay/pay.md)
@@ -252,6 +252,16 @@ has "an unapproved design stops a story whose plan is not approved either" "$(ws
 ws approve-phase tiny plan >/dev/null
 has "an approved plan carries a story past an unapproved design" "$(ws phase tiny)" "phase=build"
 
+echo "design size limit"
+new_repo approval-size
+story pay 'Payments'
+task pay 'T01 refund'
+f=$(note pay t01-refund)
+after_heading "$f" Design "$(for i in $(seq 1 16); do printf -- '- line %s\\n' "$i"; done)"
+has "approve refuses a design over 15 lines" "$(ws approve pay t01-refund)" "has 16 lines (limit 15)"
+has "a refused long design stays unapproved" "$(code approved pay t01-refund)" "6"
+has "--allow-long records a kept long design" "$(ws approve pay t01-refund --allow-long)" "approved: pay/t01-refund"
+
 echo "design approval"
 new_repo approval
 story pay 'Payments'
@@ -284,7 +294,7 @@ task pay 'T02 report'
 after_heading "$(note pay t02-report)" Design '- Edge: report()'
 git add -A && git commit --quiet -m t02
 git worktree add --quiet -b feat-report "$TMP/wt-report"
-(cd "$TMP/wt-report" && "$BASH_BIN" "$SCRIPT" claim pay t02-report feat-report >/dev/null && "$BASH_BIN" "$SCRIPT" approve pay t02-report >/dev/null)
+(cd "$TMP/wt-report" && "${WS_CMD[@]}" claim pay t02-report feat-report >/dev/null && "${WS_CMD[@]}" approve pay t02-report >/dev/null)
 has "approval made in the worktree is seen from the main checkout" "$(code approved pay t02-report)" "0"
 lacks "main checkout's copy was not touched" "$(cat "$(note pay t02-report)")" "design_approved"
 
@@ -292,8 +302,8 @@ echo "phase approvals"
 new_repo gates
 story pay 'Payments'
 has "approve-phase needs the story's project note" "$(ws approve-phase nope spec)" "no project note for story 'nope'"
-has "approve-phase needs a known phase" "$(ws approve-phase pay build)" "usage: work-state.sh approve-phase STORY spec|design|plan"
-has "approved-phase needs a known phase" "$(ws approved-phase pay nope)" "usage: work-state.sh approved-phase STORY spec|design|plan"
+has "approve-phase needs a known phase" "$(ws approve-phase pay build)" "usage: work_state approve-phase STORY spec|design|plan"
+has "approved-phase needs a known phase" "$(ws approved-phase pay nope)" "usage: work_state approved-phase STORY spec|design|plan"
 has "approving a spec needs a spec" "$(ws approve-phase pay spec)" "no spec.md for story pay"
 has "approving a plan needs a plan" "$(ws approve-phase pay plan)" "no plan.md for story pay"
 printf '# Spec\n- FR1: refund\n\n## Design\nC1: refund API.\n\n## Open questions\nNone.\n' > docs/stories/pay/spec.md
@@ -425,7 +435,7 @@ is "cites finds an epic contract" "$(ws cites pay E1)" "t01-refund todo"
 is "cites matches whole ids only" "$(ws cites pay C)" ""
 is "cites says nothing for an id nobody cites" "$(ws cites pay C9)" ""
 has "cites needs a known story" "$(ws cites nope C1)" "no story 'nope'"
-has "cites needs an id" "$(ws cites pay)" "usage: work-state.sh cites STORY ID"
+has "cites needs an id" "$(ws cites pay)" "usage: work_state cites STORY ID"
 
 echo "contracts written under headings"
 new_repo headings
@@ -499,8 +509,8 @@ ready_task() {
   after_heading "$file" Design "${DESIGN:-- Edge: x()}"
 }
 approve_all() { local s="$1" t; shift; for t in "$@"; do ws approve "$s" "$t" >/dev/null; done; }
-rdy() { "$BASH_BIN" "$SCRIPT" ready "$@" 2>/dev/null || true; }          # the listed tasks
-skips() { "$BASH_BIN" "$SCRIPT" ready "$@" 2>&1 >/dev/null || true; }    # why some were held back
+rdy() { "${WS_CMD[@]}" ready "$@" 2>/dev/null || true; }          # the listed tasks
+skips() { "${WS_CMD[@]}" ready "$@" 2>&1 >/dev/null || true; }    # why some were held back
 new_repo ready
 story shop 'Shop'
 ready_task shop 'T01 schema' '`src/db/schema.ts`, `migrations/001_init.sql`'
@@ -511,7 +521,7 @@ f=$(note shop t01-schema)
 git add -A && git commit --quiet -m plan
 is "ready changes nothing" "$(rdy shop; git status --porcelain)" ""
 is "no approved design means nothing is ready (exit 4)" "$(code ready shop)" "4"
-has "ready needs a story id" "$(ws ready)" "usage: work-state.sh ready STORY"
+has "ready needs a story id" "$(ws ready)" "usage: work_state ready STORY"
 has "ready needs a known story" "$(ws ready nope)" "no story 'nope'"
 ws approve shop t01-schema >/dev/null
 is "an approved task is listed as story/task" "$(rdy shop)" "shop/t01-schema"
@@ -564,10 +574,10 @@ git add -A && git commit --quiet -m "plan, designs, approvals"
 is "the first task starts; its dependent waits and the third shares its file" "$(rdy api)" "api/t01-model"
 ws claim api t01-model task/api/t01-model >/dev/null
 git worktree add --quiet -b task/api/t01-model "$TMP/flow-t01"
-(cd "$TMP/flow-t01" && "$BASH_BIN" "$SCRIPT" set api t01-model in-progress >/dev/null)
+(cd "$TMP/flow-t01" && "${WS_CMD[@]}" set api t01-model in-progress >/dev/null)
 is "a task running in a worktree holds its files, though this checkout's note says todo" "$(code ready api)" "4"
 has "and the reason names it" "$(skips api)" "skipped: api/t03-model-tests overlaps api/t01-model (running) on src/model.ts"
-(cd "$TMP/flow-t01" && "$BASH_BIN" "$SCRIPT" set api t01-model review >/dev/null && "$BASH_BIN" "$SCRIPT" set api t01-model done >/dev/null && git add -A && git commit --quiet -m "t01 done")
+(cd "$TMP/flow-t01" && "${WS_CMD[@]}" set api t01-model review >/dev/null && "${WS_CMD[@]}" set api t01-model done >/dev/null && git add -A && git commit --quiet -m "t01 done")
 is "done on an unmerged work branch opens nothing in the repository store" "$(code ready api)" "4"
 git merge --quiet --no-ff --no-edit task/api/t01-model
 is "merged, the dependent opens while the lock still holds the file" "$(rdy api)" "api/t02-handler"
@@ -671,7 +681,7 @@ after_heading "$(note old t02-second)" Design '- Edge: edited after its approval
 set_status old t01-first in-progress
 out=$(ws phase old)
 has "a planned story with no recorded approvals is not past spec" "$out" "phase=spec"
-has "phase points at adopt-approvals" "$out" "approvals=missing run: work-state.sh adopt-approvals old"
+has "phase points at adopt-approvals" "$out" "approvals=missing run: work_state adopt-approvals old"
 has "the hint says to ask the user first" "$out" "only if the user confirms its earlier gates passed"
 has "a task approved under the earlier fingerprint reads as changed (exit 7)" "$(code approved old t01-first)" "7"
 out=$(ws adopt-approvals old)
@@ -690,7 +700,7 @@ story calm 'Calm'
 printf '# Spec\n- FR1: y\n' > docs/stories/calm/spec.md
 printf '# Plan\n' > docs/stories/calm/plan.md
 task calm 'T01 only'
-has "a planned story whose tasks haven't started gets the note too" "$(ws phase calm)" "approvals=missing run: work-state.sh adopt-approvals calm"
+has "a planned story whose tasks haven't started gets the note too" "$(ws phase calm)" "approvals=missing run: work_state adopt-approvals calm"
 has "adopt records a story with no design as skipped" "$(ws adopt-approvals calm)" "approved: calm design as skipped, none written"
 has "and that story is in build" "$(ws phase calm)" "phase=build"
 story young 'Young'
@@ -705,15 +715,15 @@ task shop 'T01 cart'
 task shop 'T02 pay'
 git add -A && git commit --quiet -m plan
 git worktree add --quiet -b feat-cart "$TMP/wt-cart"
-(cd "$TMP/wt-cart" && "$BASH_BIN" "$SCRIPT" claim shop t01-cart feat-cart >/dev/null)
+(cd "$TMP/wt-cart" && "${WS_CMD[@]}" claim shop t01-cart feat-cart >/dev/null)
 has "claim from a worktree marks the worktree's copy" "$(cat "$TMP/wt-cart/$(note shop t01-cart)")" "status: in-progress"
 lacks "claim leaves the main checkout's copy alone" "$(cat "$(note shop t01-cart)")" "in-progress"
 has "path points at the worktree copy" "$(ws path shop t01-cart)" "$TMP/wt-cart/docs/stories/shop/_tasks/t01-cart.md"
 out=$(ws claim shop t02-pay feat-pay)
-has "claiming for a branch with no checkout yet says how to mark it" "$out" "run there: work-state.sh set shop t02-pay in-progress"
+has "claiming for a branch with no checkout yet says how to mark it" "$out" "run there: work_state set shop t02-pay in-progress"
 lacks "and leaves this checkout's note alone" "$(cat "$(note shop t02-pay)")" "in-progress"
 git worktree add --quiet -b feat-pay "$TMP/wt-pay"
-(cd "$TMP/wt-pay" && "$BASH_BIN" "$SCRIPT" set shop t02-pay in-progress >/dev/null)
+(cd "$TMP/wt-pay" && "${WS_CMD[@]}" set shop t02-pay in-progress >/dev/null)
 has "set in-progress from the worktree records the claim's branch" "$(cat "$TMP/wt-pay/$(note shop t02-pay)")" '  branch: "feat-pay"'
 # The builder edits the task note in its worktree and has not committed yet.
 after_heading "$TMP/wt-cart/$(note shop t01-cart)" Checklist '- [x] model\n- [ ] ui'
@@ -834,7 +844,7 @@ has "epics sit next to them" "$out" "epics_dir=$V/PM/app/epics"
 has "root names the vault" "$out" "vault=$V"
 has "source says the vault decided" "$out" "source=vault"
 git worktree add --quiet -b feat-a "$TMP/app-feat-a"
-has "a worktree maps to the same vault folder" "$(cd "$TMP/app-feat-a" && "$BASH_BIN" "$SCRIPT" root)" "stories_dir=$V/PM/app/stories"
+has "a worktree maps to the same vault folder" "$(cd "$TMP/app-feat-a" && "${WS_CMD[@]}" root)" "stories_dir=$V/PM/app/stories"
 rm "$V/.obsidian/plugins/project-manager/data.json"
 has "projects folder defaults to Projects" "$(ws root)" "stories_dir=$V/Projects/app/stories"
 printf '{\n  "vault": "%s",\n  "projectsFolder": "Work"\n}\n' "$V" > "$AGENT_SKILLS_CONFIG"

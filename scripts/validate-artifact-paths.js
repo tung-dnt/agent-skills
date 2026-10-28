@@ -9,7 +9,7 @@
  * back. When a producer moves an artifact without updating the consumers — as
  * in PR #93, which pointed `/spec` and `/plan` at docs/features/[name]/ while
  * `/build` still required SPEC.md and tasks/plan.md — the pipeline breaks, and
- * nothing else in CI catches it (command parity only compares descriptions).
+ * nothing else in CI catches it (validate-commands only checks descriptions).
  *
  * This validator enforces one canonical set of spec/plan/todo artifact paths
  * across every file in the pipeline. Changing the convention means updating
@@ -40,7 +40,7 @@ const ARTIFACT_ALLOWLIST = new Set([
   // Per-story layout, safe for parallel sessions (references/work-artifacts.md).
   // Task state lives in [stories-dir]/[story-id]/_tasks/[task-id].md, which this
   // pattern does not match, so only the spec and plan paths are pinned here.
-  // `[stories-dir]` is the resolved store (`work-state.sh root`: a vault folder or
+  // `[stories-dir]` is the resolved store (`work_state root`: a vault folder or
   // docs/stories); the docs/stories form is its repo-store default.
   '[stories-dir]/[story-id]/spec.md', // story spec + ## Design
   '[stories-dir]/[story-id]/plan.md', // story task index (produced by /plan, read by /build)
@@ -50,33 +50,14 @@ const ARTIFACT_ALLOWLIST = new Set([
 
 // The files that make up the spec -> plan -> build pipeline. Absent files are
 // skipped, not failed: this validator checks path consistency, not presence.
-//
-// The command bodies exist once per host surface (validate-commands.js checks
-// that the three sets stay in step on descriptions, but their prompt bodies
-// are allowed to differ), so a producer or consumer can drift on one surface
-// while the Claude Code copy stays correct. Every surface is guarded here.
 const GUARDED_FILES = [
-  // Claude Code commands
+  // Commands (Claude command format, loaded by omp)
   '.claude/commands/spec.md',
   '.claude/commands/plan.md',
   '.claude/commands/build.md',
   '.claude/commands/epic.md',
   '.claude/commands/story.md',
   '.claude/commands/task.md',
-  // Gemini CLI commands
-  '.gemini/commands/spec.toml',
-  '.gemini/commands/planning.toml',
-  '.gemini/commands/build.toml',
-  '.gemini/commands/epic.toml',
-  '.gemini/commands/story.toml',
-  '.gemini/commands/task.toml',
-  // Root command set (Antigravity, Codex, and other TOML-based hosts)
-  'commands/spec.toml',
-  'commands/planning.toml',
-  'commands/build.toml',
-  'commands/epic.toml',
-  'commands/story.toml',
-  'commands/task.toml',
   // Skills the commands invoke
   'skills/spec-driven-development/SKILL.md',
   'skills/planning-and-task-breakdown/SKILL.md',

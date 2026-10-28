@@ -33,7 +33,7 @@ These are Claude Code conventions. Keep the shared, published `SKILL.md` limited
 
 ## Gemini CLI and Antigravity
 
-Gemini CLI and Antigravity discover skills the same way: they match `name` and `description`, then load the full skill on demand. Runtime orchestration lives in a separate resource, not in the skill frontmatter.
+Gemini CLI and Antigravity discover skills the same way: they match `name` and `description`, then load the full skill on demand. In this fork the lifecycle slash commands ship only in Claude-command format (used by omp), so on these hosts the skills are invoked by name. Runtime orchestration lives in a separate resource, not in the skill frontmatter.
 
 - **Subagent definitions** live in `.gemini/agents/*.md`, which are distinct from skills. Their schema is `kind` (`local` or `remote`), `model`, `temperature`, `max_turns`, and `tools`. Note that this is a subagent schema, not a skill schema: the two should not be merged into one `SKILL.md`.
 - **Model routing** can send lighter tasks (formatting, documentation, git operations) to a faster model and reserve a stronger model for cognitively demanding work (debugging, security auditing, interface design).

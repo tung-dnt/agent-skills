@@ -21,7 +21,7 @@ Decompose work into small, verifiable tasks with explicit acceptance criteria. G
 
 ## The Planning Process
 
-### Step 1: Enter Plan Mode
+### Step 1: Read-only Planning
 
 Before writing any code, operate in read-only mode:
 
@@ -31,7 +31,7 @@ Before writing any code, operate in read-only mode:
 - Map dependencies between components
 - Note risks and unknowns
 
-**Do NOT write code during planning.** The output is a plan document and one task note per task, recorded in the task list target (see Output Files; default `[stories-dir]/[story-id]/plan.md` plus a task note per task under `_tasks/`, with `[stories-dir]` from `work-state.sh root`), not implementation.
+**Do NOT write code during planning.** The output is a plan document and one task note per task, recorded in the task list target (see Output Files; default `[stories-dir]/[story-id]/plan.md` plus a task note per task under `_tasks/`, with `[stories-dir]` from `work_state root`), not implementation.
 
 ### Step 2: Identify the Dependency Graph
 
@@ -95,7 +95,7 @@ Each task follows this structure, whether it lands in its own task note or as an
 - [ ] Build succeeds: [the repository's build command]
 - [ ] Manual check: [description of what to verify]
 
-**Dependencies and design refs:** recorded in the task note's frontmatter, never typed by hand: dependencies are passed to `work-state.sh new-task` (task ids, or none), and `work-state.sh field [story-id] [task-id] design_refs "C1, E2"` stores the shared contract ids the task cites (`C` ids from the story's design, `E` ids from its epic's architecture), so `/build` can read them.
+**Dependencies and design refs:** recorded in the task note's frontmatter, never typed by hand: dependencies are passed to `work_state new-task` (task ids, or none), and `work_state field [story-id] [task-id] design_refs "C1, E2"` stores the shared contract ids the task cites (`C` ids from the story's design, `E` ids from its epic's architecture), so `/build` can read them.
 
 **Files likely touched:**
 - `src/path/to/file.ts`
@@ -104,7 +104,7 @@ Each task follows this structure, whether it lands in its own task note or as an
 **Estimated scope:** [Small: 1-2 files | Medium: 3-5 files | Large: 5+ files]
 ```
 
-List every file the task creates or changes under **Files likely touched**, one backticked path per item, generated files and lockfiles included: `work-state.sh ready` reads that list (and the backticked paths in the task's `## Design`) to keep tasks that share a file out of the same wave.
+List every file the task creates or changes under **Files likely touched**, one backticked path per item, generated files and lockfiles included: `work_state ready` reads that list (and the backticked paths in the task's `## Design`) to keep tasks that share a file out of the same wave.
 
 Don't write the task's internal design here. Just before a task is implemented, its low-level design note is added to the task note with the `low-level-design` skill.
 
@@ -117,7 +117,7 @@ Arrange tasks so that:
 3. Verification checkpoints occur after every 2-3 tasks
 4. High-risk tasks are early (fail fast)
 
-Add each checkpoint to the task list target as a task of its own, depending on the tasks it gates, so it is claimed and completed like any other task:
+Add each checkpoint to the task list target as a task of its own, depending on the tasks it gates, so it is claimed and completed like any other task. A checkpoint makes no decisions, so its `## Design` is one line naming the commands and checks it runs, and it is approved together with the slice or batch it closes instead of at a gate of its own:
 
 ```markdown
 ## Task t04-checkpoint-foundation: Checkpoint after t01–t03
@@ -129,7 +129,7 @@ Add each checkpoint to the task list target as a task of its own, depending on t
 
 **Planning choices are trade-offs too.** When the slicing or order has real alternatives, put each to the user at the plan gate as a decision brief (`../../references/approval-gate.md`) instead of deciding silently. Typical ones: risk-first vs value-first order, one PR vs several, parallel vs sequential tasks, reuse vs build.
 
-Before any task is built, the plan passes the approval gate (`../../references/approval-gate.md`): a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead. Run it once the task notes exist, then record it with `work-state.sh approve-phase [story-id] plan`. The approval fingerprints the plan and the ids of the task notes, so adding a task afterwards voids it (see Re-planning and Splitting).
+Before any task is built, the plan passes the approval gate (`../../references/approval-gate.md`): a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead. Run it once the task notes exist, then record it with `work_state approve-phase [story-id] plan`. The approval fingerprints the plan and the ids of the task notes, so adding a task afterwards voids it (see Re-planning and Splitting).
 
 ## Task Sizing Guidelines
 
@@ -151,14 +151,14 @@ If a task is L or larger, it should be broken into smaller tasks. An agent perfo
 
 ## Output Files
 
-Plans follow the per-story layout in `../../references/work-artifacts.md`, which is built so several sessions can work one plan at once. Resolve the store first with `work-state.sh root`, as that reference describes. `[stories-dir]` below is the printed `stories_dir` (in the repo store, `docs/stories` by default; in an Obsidian vault, a folder inside it):
+Plans follow the per-story layout in `../../references/work-artifacts.md`, which is built so several sessions can work one plan at once. Resolve the store first with `work_state root`, as that reference describes. `[stories-dir]` below is the printed `stories_dir` (in the repo store, `docs/stories` by default; in an Obsidian vault, a folder inside it):
 
 - **Plan document:** Save the plan to `[stories-dir]/[story-id]/plan.md`. It holds the overview, decisions, risks, and an ordered task index. It never records task status, so it stays read-only while tasks are built.
 - **Task list:** Record each task in the **task list target** (defined below).
 
 Each story gets its own directory, so planning a new story never touches another story's plan.
 
-**Never overwrite an incomplete plan.** Before writing into an existing `[stories-dir]/[story-id]/` directory, run `work-state.sh status [story-id]` and check whether any of its tasks are not yet complete (`done` or `cancelled`):
+**Never overwrite an incomplete plan.** Before writing into an existing `[stories-dir]/[story-id]/` directory, run `work_state status [story-id]` and check whether any of its tasks are not yet complete (`done` or `cancelled`):
 
 - Same work being replanned (the user asked to revise or extend this plan) → update the plan in place. Keep existing task ids; add new tasks with the next free id; never edit a task note another session has claimed.
 - Different work → **stop and ask.** Choose a different story id rather than reusing one. Do not delete, overwrite, or rename existing task notes on your own.
@@ -170,27 +170,27 @@ The same rule applies to an external task list target: never bulk-close or delet
 
 A task that turns out too big (`low-level-design`, step 7), or work nobody planned, changes the approved plan. The procedure is in `../../references/work-artifacts.md` ("Re-planning and Splitting"); in short:
 
-1. **Retire the old task:** `work-state.sh set [story-id] [task-id] cancelled`, then `work-state.sh log [story-id] [task-id] "split into t07-…, t08-…: [reason]"`. The note stays and its id is never reused. Never do this to a task another session has claimed.
-2. **Add the replacements:** `work-state.sh new-task [story-id] "T07 [title]" [dependency-task-id…]` with the next free T number (one past the highest in the story, cancelled tasks included), then their `design_refs` and descriptions as in the Task List Target. A task that depended on the retired one now sees it as complete: if it must wait for the replacements, retire it the same way and recreate it with them as its dependencies.
+1. **Retire the old task:** `work_state set [story-id] [task-id] cancelled`, then `work_state log [story-id] [task-id] "split into t07-…, t08-…: [reason]"`. The note stays and its id is never reused. Never do this to a task another session has claimed.
+2. **Add the replacements:** `work_state new-task [story-id] "T07 [title]" [dependency-task-id…]` with the next free T number (one past the highest in the story, cancelled tasks included), then their `design_refs` and descriptions as in the Task List Target. A task that depended on the retired one now sees it as complete: if it must wait for the replacements, retire it the same way and recreate it with them as its dependencies.
 3. **Update the plan in place:** the new rows in order, and `split into …` on the old row.
-4. **Run the plan gate again** and record it with `work-state.sh approve-phase [story-id] plan`. The new task note changed the plan's fingerprint, so the story is back at phase `plan` until then.
+4. **Run the plan gate again** and record it with `work_state approve-phase [story-id] plan`. The new task note changed the plan's fingerprint, so the story is back at phase `plan` until then.
 
 ### Task List Target
 
 The task list target is where tasks and checkpoints are recorded. It is defined once, here; every other reference in this skill defers to it.
 
-- **Default: one note per task** at `[stories-dir]/[story-id]/_tasks/[task-id].md`, in the format described in `../../references/work-artifacts.md`. One note per task means parallel sessions never write the same file. This is the convention the `/build` command expects; the reference has the full lifecycle and claim protocol. Create the notes with `work-state.sh`, never by hand-writing frontmatter:
-  1. `bash [plugin-root]/hooks/work-state.sh init-story [story-id] "[Story title]" [epic-id]` creates the story's project note if it is missing (pass the epic id only when the story belongs to an epic).
-  2. For each task, in plan order: `work-state.sh new-task [story-id] "T02 Apply event" [dep-id…]`. The title starts with the plan number; the task id comes from it (`t02-apply-event`). Dependencies are task ids that already exist, so create tasks in dependency order. The command prints `task=[task-id]` and `path=…`.
+- **Default: one note per task** at `[stories-dir]/[story-id]/_tasks/[task-id].md`, in the format described in `../../references/work-artifacts.md`. One note per task means parallel sessions never write the same file. This is the convention the `/build` command expects; the reference has the full lifecycle and claim protocol. Create the notes with `work_state`, never by hand-writing frontmatter:
+  1. `work_state init-story [story-id] "[Story title]" [epic-id]` creates the story's project note if it is missing (pass the epic id only when the story belongs to an epic).
+  2. For each task, in plan order: `work_state new-task [story-id] "T02 Apply event" [dep-id…]`. The title starts with the plan number; the task id comes from it (`t02-apply-event`). Dependencies are task ids that already exist, so create tasks in dependency order. The command prints `task=[task-id]` and `path=…`.
   3. Insert the Step 4 structure (description, acceptance criteria, verification, files, scope) into the note at that path, **above** `## Design`. Leave `## Design`, `## Summary`, `## Checklist`, and `## Log` empty.
-  4. `work-state.sh field [story-id] [task-id] design_refs "C3, E1"` records the contracts the task cites: `C` ids from the story's design, `E` ids from its epic's.
+  4. `work_state field [story-id] [task-id] design_refs "C3, E1"` records the contracts the task cites: `C` ids from the story's design, `E` ids from its epic's.
 
   Every task starts as `todo`. Record checkpoints (Step 5) the same way.
 - **External tracker:** if the project's agent rules (`CLAUDE.md`, `AGENTS.md`, etc.) or the user designate an issue tracker (e.g. GitHub Issues, Jira, Linear, `bd`/beads), create one tracker item per task instead of writing task notes. Map the Step 4 structure onto the tracker's fields: acceptance criteria and verification steps in the item body, dependencies via the tracker's linking mechanism (`bd dep add`, "blocked by", etc.). Record Step 5 checkpoints as tracker items too, or as a checklist in the plan document if the tracker has no natural equivalent.
 
 When using an external tracker, note it in `[stories-dir]/[story-id]/plan.md` (e.g. "Tasks tracked in Linear project FOO") so downstream steps and future sessions know where to look, and keep the plan document's Task List section as an ordered index of tracker item IDs or links rather than a duplicate checklist.
 
-Approvals for tracked tasks live in the tracker item, not in task notes, so `work-state.sh approve` and `approve-phase … plan` can't be used for them; External Trackers in `../../references/work-artifacts.md` says where the go-ahead is recorded.
+Approvals for tracked tasks live in the tracker item, not in task notes, so `work_state approve` and `approve-phase … plan` can't be used for them; External Trackers in `../../references/work-artifacts.md` says where the go-ahead is recorded.
 
 ## Plan Document Template
 
@@ -205,7 +205,7 @@ Approvals for tracked tasks live in the tracker item, not in task notes, so `wor
 - [Key decision 2 and rationale]
 
 ## Task Index
-Status lives in each task note (`work-state.sh status`), never here. This table is a prose index of the plan.
+Status lives in each task note (`work_state status`), never here. This table is a prose index of the plan.
 
 | Id | Task | Depends on | Design refs |
 |----|------|------------|-------------|
@@ -229,7 +229,7 @@ When tasks live in an external tracker, the Task Index lists tracker item IDs or
 
 When multiple agents or sessions are available:
 
-- **How:** each session claims a task using the protocol in `../../references/work-artifacts.md`, so two sessions never take the same task or write the same file. Within one session, `/build` and `/build auto` fan independent tasks out to parallel builder subagents (`work-state.sh ready` lists the ones that can start together), following `../../references/model-routing.md`.
+- **How:** each session claims a task using the protocol in `../../references/work-artifacts.md`, so two sessions never take the same task or write the same file. Within one session, `/build` and `/build auto` fan independent tasks out to parallel builder subagents (`work_state ready` lists the ones that can start together), following `../../references/model-routing.md`.
 - **Safe to parallelize:** Independent feature slices, tests for already-implemented features, documentation
 - **Must be sequential:** Database migrations, shared state changes, dependency chains
 - **Needs coordination:** Features that share an API contract (define the contract first, then parallelize)
@@ -264,11 +264,11 @@ Before starting implementation, confirm:
 - [ ] Every task has acceptance criteria
 - [ ] Every task has a verification step
 - [ ] Task dependencies are identified and ordered correctly
-- [ ] Tasks are recorded in the task list target (default: one `todo` note per task under `[stories-dir]/[story-id]/_tasks/`, created with `work-state.sh new-task`)
+- [ ] Tasks are recorded in the task list target (default: one `todo` note per task under `[stories-dir]/[story-id]/_tasks/`, created with `work_state new-task`)
 - [ ] No pre-existing incomplete plan was overwritten without explicit user confirmation
 - [ ] No task touches more than ~5 files
 - [ ] Checkpoints exist between major phases
-- [ ] The plan passed the approval gate: summary shown, `grill-me` frontier empty, explicit go-ahead, recorded with `work-state.sh approve-phase [story-id] plan`
+- [ ] The plan passed the approval gate: summary shown, `grill-me` frontier empty, explicit go-ahead, recorded with `work_state approve-phase [story-id] plan`
 
 ## See Also
 

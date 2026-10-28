@@ -50,7 +50,7 @@ jobs:
         run: bash hooks/session-start-test.sh
 
   validate-commands:
-    name: Validate command parity and description sync
+    name: Validate command descriptions and frontmatter
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -60,7 +60,7 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Validate commands across all tool directories
+      - name: Validate commands
         run: node scripts/validate-commands.js
 
       - name: Test command validator
@@ -110,7 +110,7 @@ jobs:
       - name: Validate references/ links in skills
         run: node scripts/validate-reference-links.js
 
-      - name: Validate commands across all tool directories
+      - name: Validate commands
         run: node scripts/validate-commands.js
 
       - name: Validate spec/plan/todo artifact paths

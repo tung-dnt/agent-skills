@@ -1,6 +1,6 @@
 ---
 name: interview-me
-description: Extracts what the user actually wants instead of what they think they should want. Achieves this through one-question-at-a-time interview until ~95% confidence about the underlying intent. Use when an ask is underspecified ("build me X" without "for whom" or "why now"), when the user explicitly invokes ("interview me", "are we sure?"), or when you catch yourself silently filling in ambiguous requirements before any plan, spec, or code exists.
+description: Extracts what the user actually wants instead of what they think they should want. Achieves this through short rounds of guessed questions until ~95% confidence about the underlying intent. Use when an ask is underspecified ("build me X" without "for whom" or "why now"), when the user explicitly invokes ("interview me", "are we sure?"), or when you catch yourself silently filling in ambiguous requirements before any plan, spec, or code exists.
 ---
 
 # Interview Me
@@ -50,23 +50,27 @@ The number forces honesty. If you wrote down a high number but can't actually pr
 
 When confidence is below ~70%, append a brief reason on the same line — what's still unresolved or missing. This tells the user exactly what the interview needs to surface, and prevents the number from being a vague signal.
 
-### Step 2: Ask one question at a time, each with a guess attached
+### Step 2: Ask in rounds, each question with a guess attached
 
-Format:
+Before the first round, look up everything the files, tools, and history can tell you (one parallel pass; subagents for anything slow), so no question asks for a fact and no lookup waits between rounds.
+
+A round holds every question you can ask *now*: the ones whose framing doesn't depend on an answer you haven't heard yet. Usually 3–5. Format each:
 
 ```
-Q: <one focused question>
+Q1: <one focused question>
 GUESS: <your hypothesis for the answer, with the reasoning that produced it>
 ```
 
-Wait for the user to react before asking the next question.
+With the `ask` tool, a round is one call whose `questions[]` holds the whole round, each with your guess as the recommended option. Wait for the user's answers, update the hypothesis and confidence, then ask the next round straight away: between rounds, only look up what the new answers made necessary.
 
-**Why one at a time, not a batch:**
+**Why rounds, not one question at a time or one big list:**
 
-- The user can't react to your hypotheses if you bury them in a list
-- Batches encourage skim-reading and surface answers
-- The third question often depends on the answer to the first; asking them all at once locks in the wrong framing
-- The user's energy for thinking carefully is finite; spend it one question at a time
+- One question per message makes the user wait for the agent between every answer, and they drift to other work; a round costs one wait
+- A question that depends on an earlier answer still waits for the next round, so no framing gets locked in early
+- Each question keeps its own guess, so the user still reacts to hypotheses instead of skimming a list
+- More than about five questions is a list; split it across rounds by dependency
+
+If the user asks for one question at a time, do that instead.
 
 **Why attach a guess:**
 
@@ -226,7 +230,7 @@ After applying interview-me:
 
 - [ ] An explicit hypothesis with a confidence number was stated in the first turn
 - [ ] Every confidence number below ~70% was accompanied by a one-line reason (what's still unresolved or missing)
-- [ ] Questions were asked one at a time, each with the agent's guess attached
+- [ ] Facts were looked up before the first round; questions came in rounds of independent questions, each with the agent's guess attached
 - [ ] At least one "what would you actually want if you didn't have to justify it?" probe ran when the user gave a sophistication-signaling or convention-signaling answer
 - [ ] A concrete restate (Outcome / User / Why now / Success / Constraint / Out of scope) was written back to the user
 - [ ] The user confirmed the restate with an explicit yes (not "whatever you think," not "sounds good," not silence)

@@ -1,0 +1,12 @@
+{
+  "name": "agent-skills",
+  "private": true,
+  "scripts": {
+    "test:work-state": "bash hooks/work-state-test.sh"
+  },
+  "omp": {
+    "extensions": [
+      "./omp/index.ts"
+    ]
+  }
+}

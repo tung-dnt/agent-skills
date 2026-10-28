@@ -37,9 +37,8 @@ The portable core stays in shared directories. Host-specific paths are native di
 |---|---|---|
 | Shared workflow core | `skills/` (28 skills) | Portable `SKILL.md` workflows used by every integration |
 | Shared review material | `agents/` (6 agents), `references/` (10 references) | Specialist reviewers, delegated workers, and pack-level references carried by whole-repo installs |
-| Claude Code adapter | `.claude/commands/` (14 commands), `.claude-plugin/`, `hooks/` | Slash-command wrappers, marketplace metadata, lifecycle hooks, and `work-state.sh` |
-| Gemini CLI adapter | `.gemini/commands/` (14 commands) | Gemini-native TOML command wrappers |
-| Antigravity CLI adapter | `commands/` (14 commands), `plugin.json` | Legacy TOML wrappers and the root plugin manifest; see the [known wrapper limitation](antigravity-setup.md#lifecycle-workflows-and-command-compatibility) |
+| omp adapter | `.claude/commands/` (14 commands), `.claude-plugin/`, `package.json` + `omp/`, `hooks/` | Slash-command wrappers (the only command format in this fork, used by omp), marketplace metadata, the omp extension with the `work_state` tool, and lifecycle hooks |
+| Gemini CLI / Antigravity CLI | `plugin.json` | No command wrappers in this fork; skills are invoked by name (see [Antigravity setup](antigravity-setup.md#lifecycle-workflows-and-command-compatibility)) |
 | Codex adapter | `.codex-plugin/`, `.agents/plugins/` | Codex plugin metadata and marketplace registration; Codex consumes `skills/` directly |
 | GitHub Copilot CLI adapter | `plugin.json` | Root plugin metadata; Copilot CLI discovers `skills/` by convention and does not register the lifecycle wrappers |
 | Contributor tooling | `scripts/` (13 scripts), `evals/` (28 case files), `.github/workflows/` | Validation, routing evals, and CI |

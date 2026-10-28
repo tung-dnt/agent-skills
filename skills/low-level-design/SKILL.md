@@ -9,7 +9,7 @@ description: Produces a short low-level design note for one implementation task 
 
 Code generation is fast; deciding intent is not. Without a written low-level design, the implementation makes the hard calls silently — what happens on a duplicate, which check runs first, what a partial failure leaves behind — and makes them differently each time. This skill makes those calls explicit, in writing, before the first test, in a note short enough to read in a minute.
 
-The note is 5 to 15 lines and lives in the `## Design` section of the task's own note, `[stories-dir]/[story-id]/_tasks/[task-id].md` (the path `work-state.sh path [story-id] [task-id]` prints; or in the task's tracker item, when the plan uses an external tracker). Only the session that claimed the task writes that note, so parallel sessions never collide (see `../../references/work-artifacts.md`); the plan itself is never edited. It designs the **inside** of one task. The shared contracts it builds on — the APIs, schemas, status lifecycles, and failure policy that more than one task depends on — were fixed by the `high-level-design` skill and carry ids like `C3` (or `E1`, when an epic's architecture fixed them); this skill cites them and never changes them. Anything that belongs to this task alone — a new endpoint or table no other task reads or writes — is designed here.
+The note is 5 to 15 lines and lives in the `## Design` section of the task's own note, `[stories-dir]/[story-id]/_tasks/[task-id].md` (the path `work_state path [story-id] [task-id]` prints; or in the task's tracker item, when the plan uses an external tracker). Only the session that claimed the task writes that note, so parallel sessions never collide (see `../../references/work-artifacts.md`); the plan itself is never edited. It designs the **inside** of one task. The shared contracts it builds on — the APIs, schemas, status lifecycles, and failure policy that more than one task depends on — were fixed by the `high-level-design` skill and carry ids like `C3` (or `E1`, when an epic's architecture fixed them); this skill cites them and never changes them. Anything that belongs to this task alone — a new endpoint or table no other task reads or writes — is designed here.
 
 ## When to Use
 
@@ -25,19 +25,19 @@ The note is 5 to 15 lines and lives in the `## Design` section of the task's own
 
 ## The Process
 
-**Stop after each of steps 1–6 at a step checkpoint** (`../../references/approval-gate.md`): show what the step produced, ask about any decision it raised, otherwise ask "Continue to step N+1?", and wait. Write each confirmed step into `## Design` straight away, so the note grows one approved piece at a time. For step 1, show the facts you'll design against: the contract ids, the code paths, and the patterns to match. For a bug, or when more than one approach is plausible, the step 1 checkpoint also asks the **approach** as a decision brief, so steps 2–6 build on the chosen one. Skip the checkpoints only when the user asked for one pass ("just build it", "don't stop", batch mode); then step 7's gate is the only stop.
+**Stop at one step checkpoint, after step 1** (`../../references/approval-gate.md`): show the facts you'll design against (the contract ids, the code paths, and the patterns to match), and for a bug, or when more than one approach is plausible, ask the **approach** as a decision brief, so steps 2–6 build on the chosen one; otherwise ask "Continue to the design?", and wait. Then write steps 2–6 into `## Design` in one pass, stopping early only when a step raises a decision the user must make. The whole note is reviewed at step 7's gate. Skip the checkpoint only when the user asked for one pass ("just build it", "don't stop", batch mode); then step 7's gate is the only stop.
 
 ### Step 1: Load only what the task needs
 
-Read the task note (`work-state.sh brief [story-id] [task-id]` packs it with the plan row and the cited sections), the design sections its `design_refs` cite (shared contract ids: `C3` from the story's design, `E1` from its epic's), and the code it will touch. Follow `context-engineering`: load the relevant slices, not the whole spec. Note the patterns the existing code already uses — error style, data-access layer, transaction handling — and match them. A note that invents a second way to do what the codebase already does has failed.
+Read the task note (`work_state brief [story-id] [task-id]` packs it with the plan row and the cited sections), the design sections its `design_refs` cite (shared contract ids: `C3` from the story's design, `E1` from its epic's), and the code it will touch. Follow `context-engineering`: load the relevant slices, not the whole spec. Note the patterns the existing code already uses — error style, data-access layer, transaction handling — and match them. A note that invents a second way to do what the codebase already does has failed.
 
 ### Step 2: Contracts at this task's edges
 
-Write the signature of what the task exposes or changes: function or handler name, input and output types, the error shape. Give one concrete example value instead of prose ("returns order details" says nothing; a literal example says everything). If the task calls a shared contract, cite its id rather than restating it. An endpoint or table that belongs to this task alone is specified here in full.
+Write the signature of what the task exposes or changes: function or handler name, input and output types, the error shape. Give one concrete example value instead of prose ("returns order details" says nothing; a literal example says everything). If the task calls a shared contract, cite its id rather than restating it. An endpoint or table that belongs to this task alone is specified here in full. When the task adds or splits more than one module, add a `Modules:` line naming each with its one-line responsibility, so the review can check where each piece of logic lives.
 
 ### Step 3: Invariants and business rules
 
-List the rules this task enforces as explicit decisions, each with its outcome on violation: reject, ignore and log, or alert. Examples: "refund amount must not exceed what is left to refund → reject with 422", "an archived project accepts no new members → reject with 409". If the high-level design has a transition table, cite it by id; don't copy or re-derive it.
+List the rules this task enforces as explicit decisions, each with its outcome on violation: reject, ignore and log, or alert. Examples: "refund amount must not exceed what is left to refund → reject with 422", "an archived project accepts no new members → reject with 409". If the high-level design has a transition table, cite it by id; don't copy or re-derive it. A status field only this task owns gets its transitions here, terminal states included.
 
 ### Step 4: Flow with a failure branch at every step
 
@@ -61,7 +61,7 @@ One line each. Write "n/a" rather than skipping a line, so a reviewer can see it
 - **Failure policy** — for each boundary this task owns: timeout, retry and backoff, duplicate handling, what a partial write leaves behind
 - **Concurrency** — transaction boundary, locking, ordering or staleness guard ("apply only if the incoming event is newer")
 - **Security** — where the authorization or tenant/ownership check sits and exactly what it compares (a valid token is not enough; the token's account must own the resource). For a task with no caller — a worker or scheduled job — name the upstream trust boundary it relies on instead. Plus which fields must never appear in logs. Never a bare "n/a" when the task touches user data
-- **Observability** — which log line, metric, or trace span this task emits, if any
+- **Observability** — the log line (level and key fields), metric (exact name and tags), or trace span this task emits; for a new failure that should page someone (dead letters, repeated provider errors), the alert condition and threshold. "n/a" only when the task adds no failure path
 
 ### Step 6: Derive the test list
 
@@ -79,14 +79,14 @@ An edge case with no test is an undecided edge case.
 
 ### Step 7: Check the size, then escalate or proceed
 
-- **Over 15 lines?** The task is too big. Stop and ask for it to be split into new tasks; don't edit the plan from inside a task. A split follows the re-plan procedure (`../../references/work-artifacts.md`, "Re-planning and Splitting", summarized in `planning-and-task-breakdown`): cancel and log the old task, add the new tasks with the next free number, update the plan, and run the plan gate again.
-- **Touches anything shared?** Stop if the task changes something cited by a `C` or `E` id, adds a component, creates an endpoint, status, or event another task will use, or alters a table, endpoint, or message that any other task also reads or writes. Adding a column to a shared table counts, even if only this task will use the column. Other tasks and their tests depend on that shape. Raise it against the `## Design` section (`high-level-design`) and get it approved before continuing. Never patch a shared contract from inside a task. Once the approved change is written into the design, the contract's text has changed under every task that cites it: run `work-state.sh cites [story-id] [contract-id]` and re-gate those tasks, whose approvals are void until then.
+- **Over 15 lines, or spans two subsystems** (for example a web app and its backend)? The task is too big. Stop and ask for it to be split into new tasks, as a decision brief; don't edit the plan from inside a task. A split follows the re-plan procedure (`../../references/work-artifacts.md`, "Re-planning and Splitting", summarized in `planning-and-task-breakdown`): cancel and log the old task, add the new tasks with the next free number, update the plan, and run the plan gate again. `work_state approve` refuses a note over 15 lines; only when the user chose to keep the task whole, record it with `approve [story-id] [task-id] --allow-long`.
+- **Touches anything shared?** Stop if the task changes something cited by a `C` or `E` id, adds a component, creates an endpoint, status, or event another task will use, or alters a table, endpoint, or message that any other task also reads or writes. Adding a column to a shared table counts, even if only this task will use the column. Other tasks and their tests depend on that shape. Raise it against the `## Design` section (`high-level-design`) and get it approved before continuing. Never patch a shared contract from inside a task. Once the approved change is written into the design, the contract's text has changed under every task that cites it: run `work_state cites [story-id] [contract-id]` and re-gate those tasks, whose approvals are void until then.
 - **Adds an endpoint, table, or rule that belongs to this task alone?** That's in scope: design it in the note.
-- **Otherwise** make sure the whole note is in the task note's `## Design` section (in one-pass mode, write it now), then pass the approval gate (`../../references/approval-gate.md`). The summary goes in the task note's `## Summary`, and it always asks at least "Proceed with this design?". Show the note itself at the gate, not just the summary. For a bug, or when more than one approach is plausible, the approach must have been asked as a decision brief (options, pros, cons, effort, reversibility, and the condition that would change your pick): at the step 1 checkpoint, or here in one-pass mode. Never re-ask what a checkpoint settled. After the user's go-ahead, record it with `work-state.sh approve [story-id] [task-id]`. Editing the note afterwards, the task description above it, or a contract it cites voids the approval. Only then hand off to `test-driven-development` and `incremental-implementation`.
+- **Otherwise** make sure the whole note is in the task note's `## Design` section (in one-pass mode, write it now), then pass the approval gate (`../../references/approval-gate.md`). The summary goes in the task note's `## Summary`, and it always asks at least "Proceed with this design?". Show the note itself at the gate, not just the summary. For a bug, or when more than one approach is plausible, the approach must have been asked as a decision brief (options, pros, cons, effort, reversibility, and the condition that would change your pick): at the step 1 checkpoint, or here in one-pass mode. Never re-ask what a checkpoint settled. After the user's go-ahead, record it with `work_state approve [story-id] [task-id]`. Editing the note afterwards, the task description above it, or a contract it cites voids the approval. Only then hand off to `test-driven-development` and `incremental-implementation`.
 
 ## Note Template
 
-Fill the `## Design` section of the task note (the task's `design_refs` custom field, here `C2, C4`, says which contracts it cites; `work-state.sh field [story-id] [task-id] design_refs "C2, C4"` sets it):
+Fill the `## Design` section of the task note (the task's `design_refs` custom field, here `C2, C4`, says which contracts it cites; `work_state field [story-id] [task-id] design_refs "C2, C4"` sets it):
 
 ```markdown
 ## Design
@@ -97,7 +97,7 @@ Fill the `## Design` section of the task note (the task's `design_refs` custom f
 - Failure: provider timeout → PENDING, reconciler finishes it (C4); db error → rollback, 503, retry safe via requestId
 - Concurrency: row lock serialises refunds on the same payment
 - Security: caller's merchant id must equal payment.merchant_id, checked in step 1; never log card or bank fields
-- Observability: counter `refund_result{outcome}`
+- Observability: counter `refund_result{outcome}`; alert when `outcome=provider_error` > 5 in 10 min
 - Tests: over-refund 422 · other merchant 404 · duplicate requestId · provider timeout · db error then retry · full refund → REFUNDED
 ```
 

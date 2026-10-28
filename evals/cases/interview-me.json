@@ -31,9 +31,9 @@
       "id": 1,
       "kind": "dialogue",
       "prompt": "I want 'a better admin page'. Interview me before proposing anything.",
-      "expected_output": "A one-question-at-a-time interview that converges on validated requirements",
+      "expected_output": "An interview in short rounds of independent questions, each with a guess, that converges on validated requirements",
       "expectations": [
-        "Questions are asked one at a time, not in batches",
+        "Each round holds only questions that do not depend on an unanswered one (about 3–5), each with the agent's guess",
         "The agent does not propose solutions before understanding the need",
         "The interview surfaces the underlying goal behind the stated ask"
       ]

@@ -170,7 +170,7 @@ This portability gap is tracked in
 
 ## Spec and task artifacts
 
-The `/spec` and `/plan` commands create working artifacts: a project-level `SPEC.md`, and per story `[stories-dir]/[story-id]/spec.md`, `[stories-dir]/[story-id]/plan.md`, and one task note per task under `[stories-dir]/[story-id]/_tasks/`. `[stories-dir]` is `docs/stories` in the repo, or a folder inside your Obsidian vault when one is configured (`work-state.sh root` prints which; see the README's "Artifacts that are safe for parallel sessions"). The notes use the Obsidian project-manager format, and the commands create and update them through `hooks/work-state.sh`, never by hand. Each task note carries its own status, design note, checklist, and log, so several sessions can build the same plan without overwriting each other. [references/work-artifacts.md](../references/work-artifacts.md) has the full layout and the claim protocol. If your repo already keeps specs somewhere else, the commands detect it and propose a location in `.agent-skills.json` for you to confirm. Treat these files as **living documents** while the work is in progress:
+The `/spec` and `/plan` commands create working artifacts: a project-level `SPEC.md`, and per story `[stories-dir]/[story-id]/spec.md`, `[stories-dir]/[story-id]/plan.md`, and one task note per task under `[stories-dir]/[story-id]/_tasks/`. `[stories-dir]` is `docs/stories` in the repo, or a folder inside your Obsidian vault when one is configured (`work_state root` prints which; see the README's "Artifacts that are safe for parallel sessions"). The notes use the Obsidian project-manager format, and the commands create and update them through the `work_state` tool, never by hand. Each task note carries its own status, design note, checklist, and log, so several sessions can build the same plan without overwriting each other. [references/work-artifacts.md](../references/work-artifacts.md) has the full layout and the claim protocol. If your repo already keeps specs somewhere else, the commands detect it and propose a location in `.agent-skills.json` for you to confirm. Treat these files as **living documents** while the work is in progress:
 
 - Keep them in version control during development so the human and the agent have a shared source of truth.
 - Update them when scope or decisions change.
@@ -181,7 +181,7 @@ The `/spec` and `/plan` commands create working artifacts: a project-level `SPEC
 Three commands give each scope its own workflow, so the agent never has to guess:
 
 - `/epic [id or idea]`: interview → epic requirements (or `SPEC.md` for a whole product) → quality bar → architecture → a story map with a stub folder per story.
-- `/story [story-id]`: spec with `FR`/`NFR` ids → high-level design with shared contracts → task plan. It resumes at the story's current phase (`work-state.sh phase`).
+- `/story [story-id]`: spec with `FR`/`NFR` ids → high-level design with shared contracts → task plan. It resumes at the story's current phase (`work_state phase`).
 - `/task [story-id/task-id | story-id | description]`: claim → low-level design note → test-first build → review → commit → release. A small change with no story gets a one-task story of its own.
 
 Each command checks the scope first. If the request belongs to another scope, it says so and recommends the right command before writing anything. Every spec, design, plan, and task then passes the approval gate ([references/approval-gate.md](../references/approval-gate.md)): a catch-up summary, `grill-me` rounds over the open decisions, and your explicit go-ahead before any work starts. `/task` keeps the main session to that gate and delegates investigation, the design draft, building, and review to subagents on cheaper models.
@@ -207,7 +207,7 @@ A shell-level "Ralph loop" is harness behavior, not a separate skill workflow. I
 
 This doesn't need the `/spec` and `/plan` wrappers — plain requests work in any agent, including a `npx skills add` install that only has the skills:
 
-> Read [stories-dir]/[story-id]/spec.md, then break it into small verifiable tasks with acceptance criteria and dependency order. Save the plan to [stories-dir]/[story-id]/plan.md and create one task note per task with `work-state.sh new-task`, writing each task's description into its note. No product code yet — show me the plan first.
+> Read [stories-dir]/[story-id]/spec.md, then break it into small verifiable tasks with acceptance criteria and dependency order. Save the plan to [stories-dir]/[story-id]/plan.md and create one task note per task with `work_state new-task`, writing each task's description into its note. No product code yet — show me the plan first.
 
 > Read [stories-dir]/[story-id]/spec.md, [stories-dir]/[story-id]/plan.md and its task notes, then check where things actually stand — `git status`, plus re-running whatever checks the recorded verification state no longer covers. Tell me the next unclaimed task and anything still open, then stop: I'll confirm the scope before you start it. If the plan looks incomplete, say what's missing rather than rewriting it.
 
