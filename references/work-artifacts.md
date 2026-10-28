@@ -60,7 +60,11 @@ Decide the scope from these signals, in this order. A tracker's issue type, when
 
 If the signals point to a different scope from the command that was run, say so in one or two sentences with the evidence, recommend the right command, and continue only when the user confirms. A bug report belongs at task scope unless the fix changes a shared contract.
 
-**Jev shadow check** (`../hooks/JEV-SHADOW.md`). Unless `bash [plugin-root]/hooks/jev.sh status` printed `enabled=false` earlier in this session, pipe the request text and the signals you gathered to `bash [plugin-root]/hooks/jev.sh scope -` before deciding. If it printed `jev=<id>`, run `jev.sh outcome <id> epic|story|task` once the scope is settled (the command the work continues under). Decide the scope from the signals above as if it hadn't run.
+**Jev scope check** (`../hooks/JEV-SHADOW.md`). Unless `bash [plugin-root]/hooks/jev.sh status` printed `enabled=false` earlier in this session, pipe the request text and the signals you gathered to `bash [plugin-root]/hooks/jev.sh scope -` before deciding (the repo deny list applies; a denied repo prints `jev=skipped`). Then decide:
+- Jev answered, and its scope matches both the signals and the command that was run: continue without asking.
+- Jev answered a different scope from the command, and the signals agree with Jev: say so in one sentence with the evidence, and continue under the right command without asking. Scope is cheap to change later.
+- Jev and the signals disagree, Jev was skipped or failed, or the change would skip a design phase (task scope for work with a shared contract): ask the user as above.
+If it printed `jev=<id>`, run `jev.sh outcome <id> epic|story|task` once the scope is settled (the command the work continues under).
 
 ### Phase
 
