@@ -125,14 +125,25 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Set up Bun (runs the work_state CLI)
+        uses: oven-sh/setup-bun@v2
+
       - name: Test sdd-cache hooks (stubbed curl, no network)
         run: bash hooks/sdd-cache-test.sh
 
       - name: Test simplify-ignore hook
         run: bash hooks/simplify-ignore-test.sh
 
-      - name: Test work-state hook (throwaway git repos)
-        run: bash hooks/work-state-test.sh
+      - name: Test work_state tool (throwaway git repos)
+        run: node --test omp/work-state.test.ts
+
+      - name: Test Jev shadow pilot (local stub, no network)
+        run: node --test hooks/jev.test.ts
 
   validate:
     name: Validate plugin structure

@@ -30,7 +30,7 @@ and export `TYPESAFE_API_KEY` (from `console.typesafe.ai`). Only `api.typesafe.a
 
 ## Commands
 
-Run from inside the project. Needs `node` or `bun`.
+Run from inside the project. Needs `bun`, or `node` 22.18 or later (it runs `hooks/jev.ts` directly, stripping the types); with neither it prints `jev=skipped reason=no-runtime`.
 
 ```
 bash [plugin-root]/hooks/jev.sh status

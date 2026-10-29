@@ -2,7 +2,8 @@
   "name": "agent-skills",
   "private": true,
   "scripts": {
-    "test:work-state": "bash hooks/work-state-test.sh"
+    "test:work-state": "node --test omp/work-state.test.ts",
+    "test:jev": "node --test hooks/jev.test.ts"
   },
   "omp": {
     "extensions": [

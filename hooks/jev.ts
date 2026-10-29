@@ -11,11 +11,72 @@
 //
 // Every prediction command exits 0 and prints `jev=skipped reason=…` when it
 // can't or mustn't run (disabled, denied repository, no key, network error).
+//
+// Runs as TypeScript directly: bun, or node >= 22.18 (built-in type stripping),
+// so only erasable syntax is used here. jev.sh picks the runtime.
 import { execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
+type Kind = "checkpoint" | "scope";
+type Probabilities = { epic?: number; story?: number; task?: number };
+
+/** The `jev` section of the agent-skills config, narrowed field by field. */
+interface JevConfig {
+  enabled: boolean;
+  deny: string[];
+  /** Whatever the file held; only a non-empty string is used for requests. */
+  model: unknown;
+}
+
+/** What the API answered for the single question `q`. */
+interface Answer {
+  noul?: number;
+  choice?: string;
+  confidence?: number;
+  probabilities?: Probabilities;
+}
+
+type AskResult = { answer: Answer; model: string } | { error: string };
+
+interface PredictionBase {
+  type: "prediction";
+  id: string;
+  kind: Kind;
+  at: string;
+  repo: string | undefined;
+  model: string;
+  state_sha256: string;
+  state_chars: number;
+  step?: string;
+  story?: string;
+  task?: string;
+}
+interface CheckpointPrediction extends PredictionBase {
+  kind: "checkpoint";
+  p_open: number;
+}
+interface ScopePrediction extends PredictionBase {
+  kind: "scope";
+  choice: string;
+  probabilities?: Probabilities;
+  confidence?: number;
+}
+type Prediction = CheckpointPrediction | ScopePrediction;
+interface Outcome {
+  type: "outcome";
+  id: string;
+  at: string;
+  actual: string;
+}
+type LogRecord = Prediction | Outcome;
+type Paired = Prediction & { actual: string };
+
+type Fields = Record<string, string | number | boolean | undefined>;
+type State = { step: string; text: string } | { request: string };
+type Meta = { step?: string; story?: string; task?: string };
 
 const HOME = os.homedir();
 const CONFIG_FILE =
@@ -27,7 +88,7 @@ const LOG_FILE =
 const BASE_URL = (process.env.TYPESAFE_BASE_URL || "https://api.typesafe.ai").replace(/\/+$/, "");
 const DEFAULT_MODEL = "jev-1.13.0"; // pinned: an alias moves and would shift the recorded probabilities
 const TIMEOUT_MS = 10_000;
-const OUTCOMES = { checkpoint: ["decision", "none"], scope: ["epic", "story", "task"] };
+const OUTCOMES: Record<Kind, string[]> = { checkpoint: ["decision", "none"], scope: ["epic", "story", "task"] };
 
 const CHECKPOINT_QUESTION = {
   type: "noul",
@@ -50,7 +111,19 @@ const SCOPE_QUESTION = {
   },
 };
 
-function out(fields) {
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function num(value: unknown): number | undefined {
+  return typeof value === "number" ? value : undefined;
+}
+
+function str(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function out(fields: Fields): void {
   console.log(
     Object.entries(fields)
       .filter(([, v]) => v !== undefined && v !== "")
@@ -59,19 +132,24 @@ function out(fields) {
   );
 }
 
-function die(message) {
+function die(message: string): never {
   console.error(`jev: ${message}`);
   process.exit(2);
 }
 
-function readConfig() {
-  if (!fs.existsSync(CONFIG_FILE)) return {};
-  const parsed = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
-  const jev = parsed && typeof parsed === "object" ? parsed.jev : undefined;
-  return jev && typeof jev === "object" ? jev : {};
+function readConfig(): JevConfig {
+  const config: JevConfig = { enabled: false, deny: [], model: undefined };
+  if (!fs.existsSync(CONFIG_FILE)) return config;
+  const parsed: unknown = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+  const jev = isObject(parsed) ? parsed.jev : undefined;
+  if (!isObject(jev)) return config;
+  config.enabled = jev.enabled === true;
+  config.deny = Array.isArray(jev.deny) ? jev.deny.map((pattern) => String(pattern)) : [];
+  config.model = jev.model;
+  return config;
 }
 
-function git(args) {
+function git(args: string[]): string {
   try {
     return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   } catch {
@@ -80,48 +158,48 @@ function git(args) {
 }
 
 /** Names this repository goes by: the main worktree's folder and the origin remote's repo name. */
-function repoNames() {
-  const names = new Set();
+function repoNames(): string[] {
+  const names = new Set<string>();
   const common = git(["rev-parse", "--path-format=absolute", "--git-common-dir"]);
   if (common) {
     const base = path.basename(common);
     names.add(base === ".git" ? path.basename(path.dirname(common)) : base.replace(/\.git$/, ""));
   }
   const origin = git(["remote", "get-url", "origin"]);
-  if (origin) names.add(origin.replace(/\/+$/, "").replace(/\.git$/, "").split(/[/:]/).pop());
+  if (origin) names.add(origin.replace(/\/+$/, "").replace(/\.git$/, "").split(/[/:]/).pop() ?? "");
   names.delete("");
   return [...names];
 }
 
 /** Case-insensitive glob with `*` and `?`. */
-function globMatch(pattern, name) {
+function globMatch(pattern: string, name: string): boolean {
   const re = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".");
   return new RegExp(`^${re}$`, "i").test(name);
 }
 
 /** Why a prediction must not run here, or undefined when it may. Fails closed. */
-function blocker(config) {
-  if (config.enabled !== true) return "disabled";
+function blocker(config: JevConfig): string | undefined {
+  if (!config.enabled) return "disabled";
   const names = repoNames();
   if (names.length === 0) return "no-repo";
-  for (const pattern of Array.isArray(config.deny) ? config.deny : []) {
-    const hit = names.find((n) => globMatch(String(pattern), n));
+  for (const pattern of config.deny) {
+    const hit = names.find((n) => globMatch(pattern, n));
     if (hit) return `denied:${hit}`;
   }
   if (!process.env.TYPESAFE_API_KEY) return "no-key";
   return undefined;
 }
 
-function readState(source) {
+function readState(source: string | undefined): string {
   if (!source) die("missing input: a file path, or - for stdin");
   const text = source === "-" ? fs.readFileSync(0, "utf8") : fs.readFileSync(source, "utf8");
   if (!text.trim()) die("empty input");
   return text;
 }
 
-function parseFlags(args, allowed) {
-  const flags = {};
-  const rest = [];
+function parseFlags(args: string[], allowed: string[]): { flags: Record<string, string>; rest: string[] } {
+  const flags: Record<string, string> = {};
+  const rest: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a.startsWith("--")) {
@@ -134,22 +212,68 @@ function parseFlags(args, allowed) {
   return { flags, rest };
 }
 
-function append(record) {
+function append(record: LogRecord): void {
   fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true });
   fs.appendFileSync(LOG_FILE, `${JSON.stringify(record)}\n`);
 }
 
-function readLog() {
-  if (!fs.existsSync(LOG_FILE)) return [];
-  return fs
-    .readFileSync(LOG_FILE, "utf8")
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
+function toProbabilities(value: unknown): Probabilities | undefined {
+  if (!isObject(value)) return undefined;
+  return { epic: num(value.epic), story: num(value.story), task: num(value.task) };
 }
 
-async function ask(model, state, question) {
-  let res;
+/** Narrows one parsed log line; lines that are neither a prediction nor an outcome are dropped. */
+function toRecord(value: unknown): LogRecord | undefined {
+  if (!isObject(value)) return undefined;
+  const { id, at } = value;
+  if (typeof id !== "string" || typeof at !== "string") return undefined;
+  if (value.type === "outcome") {
+    return typeof value.actual === "string" ? { type: "outcome", id, at, actual: value.actual } : undefined;
+  }
+  if (value.type !== "prediction") return undefined;
+  const base = {
+    type: "prediction" as const,
+    id,
+    at,
+    repo: str(value.repo),
+    model: str(value.model) ?? "",
+    state_sha256: str(value.state_sha256) ?? "",
+    state_chars: num(value.state_chars) ?? 0,
+    step: str(value.step),
+    story: str(value.story),
+    task: str(value.task),
+  };
+  if (value.kind === "checkpoint") {
+    const p_open = num(value.p_open);
+    return p_open === undefined ? undefined : { ...base, kind: "checkpoint", p_open };
+  }
+  if (value.kind === "scope") {
+    const choice = str(value.choice);
+    if (choice === undefined) return undefined;
+    return {
+      ...base,
+      kind: "scope",
+      choice,
+      probabilities: toProbabilities(value.probabilities),
+      confidence: num(value.confidence),
+    };
+  }
+  return undefined;
+}
+
+function readLog(): LogRecord[] {
+  if (!fs.existsSync(LOG_FILE)) return [];
+  const records: LogRecord[] = [];
+  for (const line of fs.readFileSync(LOG_FILE, "utf8").split("\n")) {
+    if (!line) continue;
+    const record = toRecord(JSON.parse(line));
+    if (record) records.push(record);
+  }
+  return records;
+}
+
+async function ask(model: string, state: State, question: object): Promise<AskResult> {
+  let res: Response;
   try {
     res = await fetch(`${BASE_URL}/v1/systemone`, {
       method: "POST",
@@ -158,52 +282,64 @@ async function ask(model, state, question) {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (err) {
-    return { error: err?.name === "TimeoutError" ? "timeout" : "network" };
+    return { error: err instanceof Error && err.name === "TimeoutError" ? "timeout" : "network" };
   }
   if (!res.ok) return { error: `http-${res.status}` };
   try {
-    const body = await res.json();
-    const answer = body?.answers?.q;
-    if (!answer) return { error: "bad-response" };
-    return { answer, model: body.model || model };
+    const body: unknown = await res.json();
+    const answers = isObject(body) ? body.answers : undefined;
+    const q = isObject(answers) ? answers.q : undefined;
+    if (!isObject(q) || !isObject(body)) return { error: "bad-response" };
+    return {
+      answer: {
+        noul: num(q.noul),
+        choice: str(q.choice),
+        confidence: num(q.confidence),
+        probabilities: toProbabilities(q.probabilities),
+      },
+      model: (typeof body.model === "string" && body.model) || model,
+    };
   } catch {
     return { error: "bad-response" };
   }
 }
 
-async function predict(kind, state, meta) {
+async function predict(kind: Kind, state: State, meta: Meta): Promise<void> {
   const config = readConfig();
   const why = blocker(config);
   if (why) return out({ jev: "skipped", reason: why });
   const model = typeof config.model === "string" && config.model ? config.model : DEFAULT_MODEL;
   const question = kind === "checkpoint" ? CHECKPOINT_QUESTION : SCOPE_QUESTION;
-  const { answer, model: used, error } = await ask(model, state, question);
-  if (error) return out({ jev: "skipped", reason: error });
-  const valid = kind === "checkpoint" ? typeof answer.noul === "number" : typeof answer.choice === "string";
-  if (!valid) return out({ jev: "skipped", reason: "bad-response" });
+  const result = await ask(model, state, question);
+  if ("error" in result) return out({ jev: "skipped", reason: result.error });
+  const { answer, model: used } = result;
   const id = `${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`;
-  const record = {
-    type: "prediction",
+  const serialized = JSON.stringify(state);
+  const base = {
+    type: "prediction" as const,
     id,
-    kind,
     at: new Date().toISOString(),
     repo: repoNames()[0],
     model: used,
     // The text itself is never stored: only its fingerprint and size.
-    state_sha256: createHash("sha256").update(JSON.stringify(state)).digest("hex"),
-    state_chars: JSON.stringify(state).length,
+    state_sha256: createHash("sha256").update(serialized).digest("hex"),
+    state_chars: serialized.length,
     ...meta,
   };
   if (kind === "checkpoint") {
-    record.p_open = answer.noul;
-    append(record);
+    if (answer.noul === undefined) return out({ jev: "skipped", reason: "bad-response" });
+    append({ ...base, kind: "checkpoint", p_open: answer.noul });
     return out({ jev: id, p_open: answer.noul.toFixed(3), model: used });
   }
-  record.choice = answer.choice;
-  record.probabilities = answer.probabilities;
-  record.confidence = answer.confidence;
-  append(record);
-  const p = answer.probabilities || {};
+  if (answer.choice === undefined) return out({ jev: "skipped", reason: "bad-response" });
+  append({
+    ...base,
+    kind: "scope",
+    choice: answer.choice,
+    probabilities: answer.probabilities,
+    confidence: answer.confidence,
+  });
+  const p = answer.probabilities ?? {};
   return out({
     jev: id,
     scope: answer.choice,
@@ -215,9 +351,9 @@ async function predict(kind, state, meta) {
   });
 }
 
-function outcome(id, actual) {
+function outcome(id: string | undefined, actual: string | undefined): void {
   if (!id || !actual) die("usage: jev.sh outcome ID ACTUAL");
-  const prediction = readLog().find((r) => r.type === "prediction" && r.id === id);
+  const prediction = readLog().find((r): r is Prediction => r.type === "prediction" && r.id === id);
   if (!prediction) die(`no prediction ${id} in ${LOG_FILE}`);
   const allowed = OUTCOMES[prediction.kind];
   if (!allowed.includes(actual)) die(`a ${prediction.kind} outcome is one of: ${allowed.join(", ")}`);
@@ -226,20 +362,25 @@ function outcome(id, actual) {
 }
 
 /** Latest outcome per prediction id; predictions with no outcome are left out. */
-function pairs(records) {
-  const actual = new Map();
+function pairs(records: LogRecord[]): Paired[] {
+  const actual = new Map<string, string>();
   for (const r of records) if (r.type === "outcome") actual.set(r.id, r.actual);
-  return records.filter((r) => r.type === "prediction" && actual.has(r.id)).map((r) => ({ ...r, actual: actual.get(r.id) }));
+  const paired: Paired[] = [];
+  for (const r of records) {
+    const a = r.type === "prediction" ? actual.get(r.id) : undefined;
+    if (r.type === "prediction" && a !== undefined) paired.push({ ...r, actual: a });
+  }
+  return paired;
 }
 
-function report() {
+function report(): void {
   const records = readLog();
   const paired = pairs(records);
   const pending = records.filter((r) => r.type === "prediction").length - paired.length;
   console.log(`log: ${LOG_FILE}`);
   console.log(`predictions without an outcome: ${pending}`);
 
-  const cps = paired.filter((r) => r.kind === "checkpoint");
+  const cps = paired.filter((r): r is CheckpointPrediction & { actual: string } => r.kind === "checkpoint");
   const decisions = cps.filter((r) => r.actual === "decision").length;
   console.log(`\ncheckpoint: ${cps.length} paired (${decisions} with a decision, ${cps.length - decisions} without)`);
   if (cps.length) {
@@ -253,7 +394,7 @@ function report() {
     }
   }
 
-  const scopes = paired.filter((r) => r.kind === "scope");
+  const scopes = paired.filter((r): r is ScopePrediction & { actual: string } => r.kind === "scope");
   const right = scopes.filter((r) => r.choice === r.actual).length;
   console.log(`\nscope: ${scopes.length} paired, Jev agreed with the settled scope ${right}/${scopes.length}`);
   if (scopes.length) {
@@ -266,26 +407,26 @@ function report() {
   }
 }
 
-function status() {
+function status(): void {
   const config = readConfig();
   out({
-    enabled: config.enabled === true,
+    enabled: config.enabled,
     repo: repoNames().join(",") || "none",
     blocked: blocker(config) || "no",
-    model: config.model || DEFAULT_MODEL,
+    model: String(config.model || DEFAULT_MODEL),
     config: CONFIG_FILE,
     log: LOG_FILE,
   });
 }
 
-async function main(argv) {
+async function main(argv: string[]): Promise<void> {
   const [cmd, ...args] = argv;
   switch (cmd) {
     case "status":
       return status();
     case "checkpoint": {
       const { flags, rest } = parseFlags(args, ["step", "story", "task"]);
-      if (!flags.step) die("usage: jev.sh checkpoint FILE|- --step \"N/M name\" [--story ID] [--task ID]");
+      if (!flags.step) die('usage: jev.sh checkpoint FILE|- --step "N/M name" [--story ID] [--task ID]');
       return predict("checkpoint", { step: flags.step, text: readState(rest[0]) }, {
         step: flags.step,
         story: flags.story,
