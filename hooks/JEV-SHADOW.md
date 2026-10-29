@@ -16,7 +16,7 @@ Off by default. Turn it on in the per-machine agent-skills config (`~/.config/ag
   "vault": "/abs/vault",
   "jev": {
     "enabled": true,
-    "deny": ["paco*", "nhs*", "quick-scribe"],
+    "deny": ["client-*", "*-records"],
     "model": "jev-1.13.0"
   }
 }

@@ -43,10 +43,10 @@ for _ in $(seq 50); do (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null && break
 export TYPESAFE_BASE_URL="http://127.0.0.1:$port"
 sent() { [ -f "$tmp/requests" ] && wc -l <"$tmp/requests" | tr -d ' ' || echo 0; }
 
-mkdir "$tmp/app" "$tmp/paco-people"
-for r in app paco-people; do git -C "$tmp/$r" init -q -b main; done
-git -C "$tmp/app" remote add origin git@github.com:acme/nhs-records.git
-cd "$tmp/paco-people"
+mkdir "$tmp/app" "$tmp/client-portal"
+for r in app client-portal; do git -C "$tmp/$r" init -q -b main; done
+git -C "$tmp/app" remote add origin git@github.com:acme/clinic-records.git
+cd "$tmp/client-portal"
 
 # Off unless enabled, even with a key: nothing is sent.
 export TYPESAFE_API_KEY=k-test
@@ -55,12 +55,12 @@ echo '{"vault": "/v", "jev": {"enabled": false}}' >"$AGENT_SKILLS_CONFIG"
 check "enabled false" "jev=skipped reason=disabled" "$(echo x | bash "$JEV" scope -)"
 
 # The deny list matches the worktree folder, case-insensitively.
-echo '{"jev": {"enabled": true, "deny": ["PACO*"]}}' >"$AGENT_SKILLS_CONFIG"
-check "denied by folder" "jev=skipped reason=denied:paco-people" "$(echo x | bash "$JEV" checkpoint - --step 1/6)"
+echo '{"jev": {"enabled": true, "deny": ["CLIENT*"]}}' >"$AGENT_SKILLS_CONFIG"
+check "denied by folder" "jev=skipped reason=denied:client-portal" "$(echo x | bash "$JEV" checkpoint - --step 1/6)"
 # ...and the origin remote's repo name, even when the folder is allowed.
 cd "$tmp/app"
-echo '{"jev": {"enabled": true, "deny": ["nhs*"]}}' >"$AGENT_SKILLS_CONFIG"
-check "denied by origin" "jev=skipped reason=denied:nhs-records" "$(echo x | bash "$JEV" scope -)"
+echo '{"jev": {"enabled": true, "deny": ["clinic*"]}}' >"$AGENT_SKILLS_CONFIG"
+check "denied by origin" "jev=skipped reason=denied:clinic-records" "$(echo x | bash "$JEV" scope -)"
 # Outside a repository it fails closed.
 cd "$tmp"
 echo '{"jev": {"enabled": true, "deny": []}}' >"$AGENT_SKILLS_CONFIG"
