@@ -1,21 +1,19 @@
 ---
-description: Start spec-driven development — write a structured specification before writing code
+description: Start spec-driven development — clarify the request and write a structured, reviewable specification before code
 ---
 
-Invoke the agent-skills:spec-driven-development skill.
-
-**Resolve the artifact root first.** From the project, run `work_state root`. If it reports `store=repo` and `configured=false`, propose a location using its notes and write the config (`work_state configure <storiesDir>`) only after the user confirms; with `store=vault` there is nothing to propose. `[stories-dir]` below means the resolved `stories_dir` (an absolute path, possibly inside an Obsidian vault); its default in the repo store is `docs/stories`.
+Invoke `agent-skills:spec-driven-development`.
 
 Begin by understanding what the user wants to build. Ask clarifying questions about:
 1. The objective and target users
-2. Core features and acceptance criteria
-3. Tech stack preferences and constraints
-4. Known boundaries (what to always do, ask first about, and never do)
+2. Core features and testable acceptance criteria
+3. The real tech stack and constraints
+4. Boundaries: what to do, ask first about, and never do
 
-Then generate a structured spec covering all six core areas: objective, commands, project structure, code style, testing strategy, and boundaries.
+Write a specification covering objective, commands, project structure, code style, testing strategy, and boundaries. For a story or feature, number functional requirements (`FR1`…) with testable acceptance criteria and non-functional requirements (`NFR1`…) with measurable targets. Preserve the skill's scope, capability-map, design, and quality requirements.
 
-For a story or feature spec, write the requirements in the shape `/story` uses: numbered functional requirements (`FR1`…) whose acceptance criteria can be tested, and non-functional requirements (`NFR1`…) as targets, drawing on `CONSTRAINTS.md` when it exists. The design and the task notes trace back to those ids.
+Choose a static artifact path with the user or follow the repository's established spec convention. A project-wide spec commonly lives in `SPEC.md`; a story spec may live beside its other approved design artifacts. Do not require a `work_state` root, vault configuration, project task store, or generated task-note location. If several independently testable capabilities are bundled, propose and gate a capability map before writing module specifications.
 
-If the request bundles several independently testable capabilities, first propose a capability map (module ids, dependency direction, build order) per the skill's Phase 0 and get it approved, then spec each module in dependency order.
+Pass the approval gate in `references/approval-gate.md`: show the result and its absolute path, grill open decisions, and ask the user to approve or revise it. Stop after the spec gate. Do not start planning or code until the user explicitly approves the spec in a later step. An artifact being present or a native todo being checked is not approval.
 
-Save a spec for the whole project as SPEC.md in the project root. Save a spec for one story or feature as `[stories-dir]/[story-id]/spec.md`, where the story id is a tracker key or a short kebab-case slug (ask if unclear); create the story's project note first with `work_state init-story [story-id] "[title]"` if it doesn't exist. Then pass the approval gate (`references/approval-gate.md` in the plugin): write and show the catch-up summary, run agent-skills:grill-me rounds over the open decisions (always at least one question), and wait for the user's explicit go-ahead before anything else happens. For a story, save the summary to `[stories-dir]/[story-id]/summary.md`, and record the go-ahead with `work_state approve-phase [story-id] spec`; a spec nobody approved leaves the story at phase `spec`.
+When work is registered for verification, user approval is obtained through the user-facing approval interaction, never a model-supplied approval flag. The operations `begin`, `run`, `status`, `complete`, and `cancel` apply to verification evidence; `complete` records evidence, not planning progress. Unregistered work is not advertised as hard-verified.

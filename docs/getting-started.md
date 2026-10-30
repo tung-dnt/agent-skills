@@ -131,7 +131,6 @@ The `.claude/commands/` directory contains slash commands for Claude Code:
 | `/constraints` | constraint-driven-development |
 | `/plan` | planning-and-task-breakdown |
 | `/build` | incremental-implementation + test-driven-development |
-| `/build auto` | planning-and-task-breakdown → incremental-implementation + test-driven-development (whole plan, one approval) |
 | `/test` | test-driven-development |
 | `/review` | code-review-and-quality |
 | `/code-simplify` | code-simplification |
@@ -168,48 +167,42 @@ needed checklist into a `references/` directory inside the installed skill.
 This portability gap is tracked in
 [addyosmani/agent-skills#361](https://github.com/addyosmani/agent-skills/issues/361).
 
-## Spec and task artifacts
+## Specs, plans, and task artifacts
 
-The `/spec` and `/plan` commands create working artifacts: a project-level `SPEC.md`, and per story `[stories-dir]/[story-id]/spec.md`, `[stories-dir]/[story-id]/plan.md`, and one task note per task under `[stories-dir]/[story-id]/_tasks/`. `[stories-dir]` is `docs/stories` in the repo, or a folder inside your Obsidian vault when one is configured (`work_state root` prints which; see the README's "Artifacts that are safe for parallel sessions"). The notes use the Obsidian project-manager format, and the commands create and update them through the `work_state` tool, never by hand. Each task note carries its own status, design note, checklist, and log, so several sessions can build the same plan without overwriting each other. [references/work-artifacts.md](../references/work-artifacts.md) has the full layout and the claim protocol. If your repo already keeps specs somewhere else, the commands detect it and propose a location in `.agent-skills.json` for you to confirm. Treat these files as **living documents** while the work is in progress:
+`/spec` and `/plan` produce static requirements, designs, plans, and worker briefs at paths chosen by the user or established by the repository. These artifacts carry acceptance criteria, decisions, dependencies, exact file ownership, and verification expectations. They do not store mutable task status. The main session uses native todo as its only progress list and native task for worker execution; it does not require an Obsidian vault, `_tasks` directory, work-state tool, or replacement project JSON store. See [Work Artifacts and Native Progress](../references/work-artifacts.md) and the [Native Task Workflow](native-task-workflow.md).
 
-- Keep them in version control during development so the human and the agent have a shared source of truth.
-- Update them when scope or decisions change.
-- If your repo doesn’t want these files long‑term, delete them before merge or add the folder to `.gitignore` — the workflow doesn’t require them to be permanent.
+- Keep static artifacts where they can be reviewed and handed to a worker by absolute path.
+- Update them only when scope/design changes; use the user gate before proceeding on a changed decision.
+- Never add task status, claim data, or worker logs to a second Markdown/JSON board.
 
 ### Working by scope
 
-Three commands give each scope its own workflow, so the agent never has to guess:
+- `/epic [id or idea]`: clarify intent → requirements → architecture when needed → ordered story map.
+- `/story [work-id]`: approved requirements → high-level design/contracts when needed → static task plan and briefs.
+- `/task [work-id]`: one focused task → approved low-level design for every planned task (concise even when mechanical) → test-first implementation and review; only ad-hoc mechanical changes with no decisions may omit LLD.
+- `/build [work-id]`: every planned task's approved LLD gate → main-owned order/file ownership → native task workers as useful.
 
-- `/epic [id or idea]`: interview → epic requirements (or `SPEC.md` for a whole product) → quality bar → architecture → a story map with a stub folder per story.
-- `/story [story-id]`: spec with `FR`/`NFR` ids → high-level design with shared contracts → task plan. It resumes at the story's current phase (`work_state phase`).
-- `/task [story-id/task-id | story-id | description]`: claim → low-level design note → test-first build → review → commit → release. A small change with no story gets a one-task story of its own.
-
-Each command checks the scope first. If the request belongs to another scope, it says so and recommends the right command before writing anything. Every spec, design, plan, and task then passes the approval gate ([references/approval-gate.md](../references/approval-gate.md)): a catch-up summary, `grill-me` rounds over the open decisions, and your explicit go-ahead before any work starts. `/task` keeps the main session to that gate and delegates investigation, the design draft, building, and review to subagents on cheaper models.
+Every nontrivial requirements, design, and plan phase uses the approval gate ([references/approval-gate.md](../references/approval-gate.md)): show the artifact and a concise catch-up summary, grill unresolved decisions, and wait for an explicit user go-ahead. In addition, every task in a written breakdown has an approved low-level design before code, including mechanical tasks; the note may be concise and a user-approved slice may cover several designs. A native todo, native task completion, imported note, or model argument is not approval. A genuinely ad-hoc mechanical change with no design decisions may omit LLD. The user-facing approval interaction cannot be replaced by `approved=true`.
 
 ### Working across sessions
 
-The same artifacts are the handoff between sessions. For a small task, run the whole lifecycle in one session. For anything non-trivial, a fresh session per phase (spec → plan → build → review) keeps context focused — what carries the work forward is the approved files, not the conversation:
+Static specs, designs, plans, and worker briefs can be handed between sessions by path, but native todo/task state is session-scoped. Do not assume another session can see the same native checklist, worker output, ordering, or ownership. The main session coordinates directly with any other owner before shared-file edits.
 
-- the spec — `SPEC.md`, or wherever your spec actually lives
-- the story's `[stories-dir]/[story-id]/plan.md` and its task notes — or the external tracker the plan identifies, if you use one
+At a boundary, record the next decision/context in the relevant static artifact if it is part of the approved design, then tell the user the exact next command and which checks remain. Keep verification evidence separate from progress: report the exact check command, candidate, and observed result. Re-run checks when the candidate moved or evidence is missing/stale.
 
-`/story` and `/build` say when to switch: after each approved phase and each completed build wave they log what is next, name the command to run, and recommend a new session (see [references/model-routing.md](../references/model-routing.md), "Fresh Orchestrator at Boundaries").
+In a new session, `/resume` reads back the native todo state available to that session, supplied artifact paths, accessible worker output, and repository state. It cannot restore another session's native todo, claim, project-wide readiness, or unprovided worker logs. If the previous state is unavailable, say what is unknown and ask the user before taking over or changing ownership. After manual todo edits or rewind, use a fresh native view readback before protected completion rather than guessing.
 
-**Before switching**, make sure those files reflect the decisions that still apply, the scope you approved, the questions still open, the next task, and the current verification state (which tests ran, against what).
+#### Task-boundary restarts and external loops
 
-**In the new session**, run `/resume` (Claude Code also suggests it at startup when a claimed task exists). It has a read-only subagent rebuild the ticked progress tree, find where each in-progress task stopped, and recommend the next step. Without the command, read the actual files and look at `git status` before doing anything. Don't assume approvals you can't see in the artifacts. Treat a recorded "tests pass" as a claim about a specific baseline: re-run the checks it covers if the code has moved since, if it doesn't say what was run against what, or if you're about to touch the area it covered. If the baseline still holds, take it and get on with the next task — the point is a check proportional to what changed, not a full suite at every handoff.
+A host may restart at a boundary only when its native session state and approved artifacts remain accessible. A process exit or native task completion is not evidence that tests passed. A restart must not bypass a user approval gate or invent the next task from a project-wide board. The main integration owner still runs required full, integration, and runtime/browser checks at a stable boundary.
 
-#### Task-boundary restarts and Ralph loops
+Plain requests work in any agent with the skills installed. For example:
 
-`/build auto` can run the whole approved plan in one session. It does not require or perform a fresh process per task. Its per-task status updates, verification results, and commits make each completed task a restartable boundary, so a capable external harness may exit and resume there without depending on chat history.
+> Read the approved requirements and relevant code, then break the work into small vertical tasks. Write a static ordered plan and one static brief per task with acceptance criteria, dependencies, allowed paths, and focused verification. Do not edit product code or create a task-status board. Show the plan and ask for approval.
 
-A shell-level "Ralph loop" is harness behavior, not a separate skill workflow. If you use one, restart only after the current task has reached a recorded boundary; on re-entry, read the durable artifacts and repository state before selecting the next `todo` task. A process exit is not evidence that a task passed, and a restart must not bypass an approval gate. See the `context-engineering` skill's **Restartable Session Boundaries** section for the handoff checklist.
+> Read the current native todo view, supplied static briefs, and repository state. Compare worker output with actual code and report exactly which checks ran and which did not. Do not infer another session's task ownership or start additional work; recommend one safe next action.
 
-This doesn't need the `/spec` and `/plan` wrappers — plain requests work in any agent, including a `npx skills add` install that only has the skills:
-
-> Read [stories-dir]/[story-id]/spec.md, then break it into small verifiable tasks with acceptance criteria and dependency order. Save the plan to [stories-dir]/[story-id]/plan.md and create one task note per task with `work_state new-task`, writing each task's description into its note. No product code yet — show me the plan first.
-
-> Read [stories-dir]/[story-id]/spec.md, [stories-dir]/[story-id]/plan.md and its task notes, then check where things actually stand — `git status`, plus re-running whatever checks the recorded verification state no longer covers. Tell me the next unclaimed task and anything still open, then stop: I'll confirm the scope before you start it. If the plan looks incomplete, say what's missing rather than rewriting it.
+See the [Native Task Workflow](native-task-workflow.md) for the public workflow and verification boundary.
 
 ## Tips
 

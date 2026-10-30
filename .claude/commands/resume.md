@@ -1,15 +1,14 @@
 ---
-description: Restore where a previous session left off — ticked progress tree, where each in-progress task stopped, and the next step
+description: Resume from the current native todo/task view and static artifacts without claiming cross-session project state
 ---
 
-Recover the state of in-progress work after a session ended or crashed. `$ARGUMENTS` may name a story id; empty means every story. The state lives in task notes, claim branches, and worktrees, as described in the agent-skills work-artifacts reference (`references/work-artifacts.md` in the plugin).
+Recover only what is available to this session. Native todo is the sole mutable progress list for the active main session; native task owns worker execution and output. Static artifacts and current repository/Git state provide context, not a second status store.
 
-1. **Resolve the artifact root.** From the project, run `work_state root`. If it reports `store=repo` and `configured=false`, propose a location using its notes and write the config (`work_state configure <storiesDir>`) only after the user confirms; with `store=vault` there is nothing to propose. If it flags the old `tasks/` layout, tell the user to run `work_state migrate`.
-2. **Investigate read-only, in a fresh context.** Spawn the `agent-skills:state-investigator` subagent (read-only, fast tier). If subagents aren't available, do this yourself without editing, committing, or deleting anything. Give it the story id and resolved root, and have it:
-   - run `work_state status [story-id]` for the ticked tree
-   - for every in-progress (`[~]`) or blocked (`[!]`) task, read its task note from the freshest copy. In the repo store: the worktree shown in the tree if there is one (uncommitted edits included), otherwise `git show [work-branch]:[stories-dir relative to the repo]/[story-id]/_tasks/[task-id].md`. In the vault store there is a single copy, at the path `work_state path [story-id] [task-id]` prints (the note isn't in git, so no `git show`). Read the acceptance criteria, `## Design`, `## Checklist`, `## Log`
-   - where the tree shows a worktree, run `git -C [worktree] status --short` and `git -C [worktree] log -1 --oneline` to find uncommitted work and the last commit
-   - report the ticked tree, then for each in-progress task: what is done (ticked criteria and checklist items, checked against the code actually present, last commit), what is uncommitted, the next step from the last log line, and a recommended next action
-3. **Present the report** and ask the user which task to continue. Continuing a claimed task means working on its recorded work branch or worktree; never claim it again. Adopt a task whose work branch isn't this checkout only when the user confirms its previous session is gone. Then continue with /build.
+1. Read the current native todo view first. If its state may have changed through a manual edit or rewind, use the host's native todo readback and reconcile before making protected changes; never infer an unknown phase or completion.
+2. Invoke `agent-skills:state-investigator` for a read-only check, or investigate yourself if the host cannot provide a worker. Supply the repository root and absolute paths of known static artifacts. The investigator compares the native view (if accessible), artifact scope/design/acceptance, actual code, and `git status`/relevant commits. It must not edit, stage, commit, checkout, reset, claim, or delete.
+3. Ask the investigator to distinguish observed facts from inference: which native items are present; which worker outputs/reports are accessible; artifact paths and decisions; changed/uncommitted files; what focused or integration checks are actually evidenced; and the next safe action.
+4. Present the read-only report. The main session chooses order and file ownership and asks the user before continuing when scope, approval, or ownership is uncertain.
 
-Nothing is edited, committed, or deleted during steps 1 and 2.
+`/resume` can use only the current session's native state, supplied artifacts, accessible worker outputs, and repository state. It does not reconstruct a project-wide board, another session's todo, task ownership, claims, or automatic DAG readiness. If those native items or outputs are not accessible, say exactly what is missing; do not synthesize them from prose, a task file, a branch name, or a worker's status.
+
+Design and policy approval must be visible in the current conversation or supported session binding before continuing registered work. A task's native completion is not test proof. For registered verification work, `begin`, `run`, `status`, `complete`, and `cancel` refer to evidence-run operations only; user-facing approval is required, and unregistered work is not advertised as hard-verified.

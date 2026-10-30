@@ -35,15 +35,15 @@ A new project is the best-case scenario: there's no legacy behavior to preserve,
 
 Run the lifecycle in order for the project's first real feature:
 
-```
-/spec   →  SPEC.md            (spec-driven-development)
-/plan   →  [stories-dir]/[story-id]/plan.md + _tasks/  (planning-and-task-breakdown)
-/build  →  one slice at a time (incremental-implementation + test-driven-development)
-/review →  before every merge  (code-review-and-quality)
-/ship   →  when going live     (shipping-and-launch)
+```text
+/spec   → approved requirements artifact
+/plan   → approved static plan + worker briefs + current-session native todo
+/build  → native task workers where useful; main-owned order and file ownership
+/review → before every merge
+/ship   → when going live
 ```
 
-`/build auto` is a good fit for greenfield: you approve the plan once and every task still runs test-driven and commits individually. The spec and plan artifacts (`SPEC.md`, `[stories-dir]`, which is `docs/stories/` in the repo store or a folder in your Obsidian vault) are living documents, keep them in version control while the work is in flight (a vault is its own store, outside the repo's git). If the feature spans more than one session, those files are also the handoff, see [working across sessions](getting-started.md#working-across-sessions).
+Keep the spec, design, plan, and worker briefs as static artifacts at paths agreed with the user or already established by the repository. Native todo is the main session's only mutable progress list; do not create a task-status note, vault task store, or replacement project JSON board. A user gate approves scope/design; a task worker's completion does not prove tests passed. See the [Native Task Workflow](native-task-workflow.md) and [Working Across Sessions](getting-started.md#working-across-sessions) for the session-local limits.
 
 ### From the start, treat these as always-on
 

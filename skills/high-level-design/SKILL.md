@@ -1,58 +1,52 @@
 ---
 name: high-level-design
-description: Produces the high-level design for a user story, feature, or epic after its requirements are written — the system architecture (which services, modules, and data stores are involved and what each owns, data flow, sync versus async calls, how each non-functional requirement is met) plus the shared contracts that several implementation tasks will depend on (status lifecycles, schema changes, cross-service failure policy). Use when a user story or spec needs a system design or architecture before planning the tasks. Use when a change adds or reshapes services, data stores, queues, or integrations and nobody has decided how they fit together yet.
+description: Produces system architecture for a story, feature, or epic with services, components, data stores, data flow and sequence diagrams, sync versus async calls, non-functional mechanisms, and shared contracts. Use when approved requirements need a high-level system design before task planning, or a change reshapes services, queues, or integrations.
 ---
 
 # High-Level Design
 
 ## Overview
 
-Requirements say *what* the system must do. High-level design decides *what shape of system* will do it, and fixes the contracts that more than one task will build against. Skipping it doesn't remove those decisions; it scatters them across tasks, where each implementation makes its own silent, inconsistent choice. The test for a finished design: "If we build this shape, will it realistically meet the requirements, and can each task be built without re-deciding anything shared?"
+Requirements decide what the system must do. High-level design decides the shape that will meet them and fixes decisions shared by multiple implementation tasks. Without it, each task silently chooses its own APIs, data ownership, lifecycle, and failure behavior.
 
 The design has two layers:
+- **Shape:** components, flows, data ownership, and how each non-functional requirement is met.
+- **Shared contracts:** APIs, schema, status lifecycles, and failure policies used by more than one task.
 
-- **Shape** — what you could draw on a whiteboard in ten minutes: components, flows, data ownership, and how each non-functional requirement is met.
-- **Shared contracts** — the spec-sheet details that several tasks depend on: API contracts, schema changes, status lifecycles, cross-component failure policy. Decide these here, once, before tasks are planned.
-
-Everything local to a single task — internal functions, local edge cases — is left to the `low-level-design` skill.
+Task-local functions and edge cases belong in `low-level-design`. Static design artifacts are handed to workers by path; they never serve as mutable task-status stores.
 
 ## When to Use
 
-- A spec or user story has approved functional and non-functional requirements, and tasks have not been planned yet
-- The change adds or reshapes a service, module, data store, queue, or third-party integration
-- Several tasks will share an API, a table, a status field, or an event stream
-- An epic needs its architecture settled before stories are cut
+- Requirements are approved and task planning has not started.
+- The change adds/reshapes a component, service, data store, integration, queue, or shared boundary.
+- More than one task depends on a common API, table, status field, or event stream.
+- An epic needs architecture before stories are split.
 
-**When NOT to use:**
+Do not design against unclear requirements; use `spec-driven-development` first. A change inside one existing module with no shared contract may skip high-level design only after the user explicitly agrees. A single interface surface belongs in `api-and-interface-design`.
 
-- Requirements are still unclear. Use `spec-driven-development` (or `interview-me`) first; designing against guessed requirements produces a confident wrong design.
-- The change lives inside one existing module and changes no shared contract. Go straight to `planning-and-task-breakdown`, then `low-level-design` per task. Once the user agrees to skip the design, record it with `work_state approve-phase [story-id] design` (no `## Design` written), so the story's phase moves on.
-- You only need one interface's surface (fields, errors, versioning). Use `api-and-interface-design`.
+## Process
 
-## The Process
+Work top-down. Follow the checkpoints in `../../references/approval-gate.md`: pause after steps 1, 5, and 9 unless the user explicitly requested a one-pass design. A one-pass request never skips the final user approval. Show each result, ask any decision as soon as it arises, and wait before relying on it.
 
-Work top-down. Finish the shape layer before the contracts layer; contracts written before the shape is agreed get rewritten.
+### 1. Load inputs and current architecture
 
-**Stop at three step checkpoints** (`../../references/approval-gate.md`): after step 1 (the FR and NFR ids and the existing components you'll build on), after step 5 (the shape: scope, components, flows, data), and after step 9 (NFR mechanisms, integrations, security, deployment and rollout). At each, show the sections written since the last checkpoint, ask about any decision they raised as a decision brief, otherwise ask "Continue?", and wait. A decision that is expensive to reverse is asked as soon as a step raises it, not held for the next checkpoint. Write each confirmed section into `## Design` before going on, so a later step never rests on an unconfirmed one. Steps 10–11 go straight to step 12's gate. Skip the checkpoints only when the user asked for one pass ("don't stop", "draft it in one go"); then step 12's gate is the only stop.
+- Read approved requirements and assign stable `FR` and `NFR` IDs where missing.
+- Read `CONSTRAINTS.md` and the existing architecture/ADRs if present.
+- Read the components, data stores, and integrations the change will touch; extend existing patterns before proposing new ones.
+- Use an approved epic/architecture artifact supplied by the main session where relevant. Cite its shared contract IDs rather than copying or contradicting them.
+- For a large unfamiliar codebase, delegate a read-only summary and keep exact source paths in the design.
 
-### Step 1: Load inputs and read what exists
+### 2. Scope
 
-- Read the spec. Give every functional requirement and non-functional requirement a stable id (`FR1`, `NFR1`) if it lacks one; the design traces back to these.
-- Read `CONSTRAINTS.md` if the project has one (see `constraint-driven-development`); its thresholds are non-functional requirements too.
-- Read the existing architecture: the repo's system design (`docs/architecture/hld-<system>.md`, when it exists), current services, data stores, integration points, and existing ADRs. Extend what exists before inventing something new. In a large codebase, delegate this reading to a fast-tier, read-only subagent that returns a short component summary, so the design context stays small. Give it the subagent command rules from `../../references/model-routing.md`, so it never stops the user with permission prompts.
-- When the story belongs to an epic, read the epic's `## Architecture` in `[epics-dir]/[epic-id]/epic.md` too. Its `E` contracts already bind the story: cite them by id instead of restating them.
+Name what the design includes and explicitly excludes, plus stakeholders who must accept it. Add a small context diagram showing the system, users, and external systems.
 
-### Step 2: Scope
+### 3. Components and responsibilities
 
-Write what the design covers and, explicitly, what it does **not**, plus the stakeholders who must accept it (teams, users, partners, compliance). The out-of-scope list is what stops the design, and later the tasks, from quietly growing. Add a small context diagram: the system as one box, with the users and external systems around it.
+List each new or modified component and the responsibility/data it owns. Prefer extending an existing component when it can do the job; explain why a new component is justified.
 
-### Step 3: Components and responsibilities
+### 4. Flows
 
-List each component the change touches — new or modified — with one line on what it owns. One owner per responsibility. If a new component's job could be done by modifying an existing one, prefer the modification and say why it isn't enough if you still add one.
-
-### Step 4: Flows
-
-Draw the main flows as sequence diagrams. Label every hop **sync** or **async**, and mark each flow **critical path** (a user waits on it) or **background**. Draw the happy path plus only the failure paths that change the design (for example, "the carrier is down, so ingestion must be async"). Exhaustive edge cases belong in `low-level-design`.
+Show important flows as sequence diagrams. Label each hop sync or async and each flow critical-path or background. Include the happy path and only failure paths that affect the design; task-local edge cases belong in LLD.
 
 ```mermaid
 sequenceDiagram
@@ -66,68 +60,65 @@ sequenceDiagram
     Q->>K: consume (async)
 ```
 
-### Step 5: Data ownership
+### 5. Data ownership
 
-For each entity the change touches: which component owns (writes) it, who else reads it and how, and the retention or regulatory rule that applies (retention period, deletion, personal-data handling). Name the entities and the migration strategy here. Column-level detail goes in Step 10 only if more than one task depends on it.
+For each entity: identify its writer/owner, readers and access path, retention/privacy rules, and migration strategy. Put column-level detail in a shared contract only when multiple tasks depend on it.
 
-### Step 6: Non-functional requirements → mechanisms
+### 6. NFR mechanisms
 
-Never restate a target without a mechanism. For each NFR:
+For each NFR, state the concrete mechanism and how it will be verified. A target with no mechanism is not a complete design.
 
-| NFR | Target | Mechanism | How it's verified |
+| NFR | Target | Mechanism | Verification |
 |---|---|---|---|
-| NFR1 | p95 status read < 200 ms | Read from a cache keyed by order id, invalidated by the worker | Load test on the read endpoint |
-| NFR3 | No cross-account reads | Ownership check in the read handler, comparing the caller's account with the order's owner | Negative test: account A reads account B's order → 404 |
+| NFR1 | p95 read < 200 ms | Cache keyed by order id, invalidated by worker | Load test |
+| NFR2 | No cross-account reads | Ownership check in handler | Negative test across accounts |
 
-An NFR with no mechanism is an unmet requirement.
+### 7. Integrations and consistency
 
-### Step 7: Integrations and consistency
+For each external/cross-component call, decide timeout, retry/backoff, circuit breaking where needed, and strong/eventual consistency. If data is eventual, specify maximum staleness and what the user sees.
 
-For each external or cross-component call: timeout, retry and backoff, circuit breaker if the dependency can degrade, and whether the result is **strongly** or **eventually** consistent. If eventual, state how stale the data can be and what the user sees meanwhile.
+### 8. Security and compliance
 
-### Step 8: Security and compliance
+Identify authentication and authorization points, tenant/ownership checks, trust boundaries, encryption, sensitive data, and fields that must never be logged. Use `security-and-hardening` for untrusted inputs or sensitive data.
 
-A separate pass, not a line inside Step 6: how callers authenticate, where authorization and tenant or ownership scoping are enforced, trust boundaries (which inputs are untrusted), encryption, and which sensitive fields must never be logged. Pull in `security-and-hardening` when the change handles untrusted input or sensitive data.
+### 9. Deployment and rollout
 
-### Step 9: Deployment and rollout
+State environments and relevant differences, deployment models, CI/CD shape, feature flags, migration order (expand → deploy → contract), and staged rollout if warranted. `shipping-and-launch` owns the full launch checklist.
 
-A few lines: the environments the change passes through (dev, test, staging, production) and what differs between them (config, secrets, data), the deployment model of each new or changed component (for example Lambda, container, static site), the CI/CD shape that ships it, a feature flag or not, migration order (expand → deploy → contract), and a canary or staged rollout if the blast radius warrants it. `shipping-and-launch` owns the full checklist.
+### 10. Shared contracts
 
-### Step 10: Shared contracts
+Record a contract only when at least two tasks depend on it; a single-task detail belongs in LLD. Give each shared contract a stable ID `C1`, `C2`, … (or cite the approved epic `E` contract). Include concrete examples for:
+- API method/path/request/response and error behavior.
+- Schema types/nullability, constraints, and index rationale.
+- Status transitions, terminal states, and invalid-transition behavior.
+- Shared failure policy: idempotency, retries/backoff, dead letters, and partial-write behavior.
 
-For each item below, write it down only if **more than one task** depends on it. A contract used by a single task belongs in that task's low-level design.
+### 11. Alternatives and decisions
 
-- **API contracts** — method, path, request and response with concrete JSON examples for success and each error. Follow `api-and-interface-design` for the rules; this step only records the decisions.
-- **Schema changes** — tables and columns with types and nullability, constraints, *why* each index exists, soft or hard delete.
-- **Status lifecycles** — any field with statuses gets a transition table: allowed transitions, terminal states, and a decided outcome for every invalid transition (reject, ignore and log, or alert). Don't let an implementer improvise it.
-- **Failure policy at shared boundaries** — idempotency key, retry count and backoff, dead-letter handling, and what a partial write leaves behind.
+For decisions expensive to reverse, compare at least two viable options against requirements/NFRs, effort, risk, and reversibility. Present the hinges and the condition that would change the recommendation as a decision brief. Record durable decisions with `documentation-and-adrs` where the repository's ADR convention applies.
 
-### Step 11: Alternatives and decision
+### 12. Adversarial review and user approval
 
-Put each decision that is expensive to reverse (sync versus async, new store versus existing, build versus buy) to the user as a decision brief (`../../references/approval-gate.md`): at least two viable designs, their pros and cons measured against the NFRs, effort, reversibility, what the choice hinges on, and when you'd choose differently. Record each chosen decision as an ADR using `documentation-and-adrs`, including the rejected options and why they lost.
-
-### Step 12: Doubt, then human approval
-
-Run the design through `doubt-driven-development` with the spec as the contract, on the deep tier (the main thread's model), in a fresh context: a fresh-context reviewer looks for requirements with no design element, NFRs with no mechanism, and failure paths nobody owns. Fold the findings back in, then pass the approval gate (`../../references/approval-gate.md`): a catch-up summary, `grill-me` rounds over the decisions still open (never re-ask what a checkpoint settled), and the user's explicit go-ahead. Record the go-ahead with `work_state approve-phase [story-id] design`: the story's phase doesn't advance without it, and editing the design afterwards voids it. Tasks are planned only against an approved design.
+Run `doubt-driven-development` in a fresh context against the approved spec: find requirements with no design, NFRs without a mechanism, and unowned failure paths. Resolve findings, then pass the user gate in `../../references/approval-gate.md`. The user must explicitly approve before task planning. No native todo item, worker status, or artifact path is approval.
 
 ## Output
 
-Write the design into the story spec, `[stories-dir]/[story-id]/spec.md` (`docs/stories/[story-id]/spec.md` in the repo store; directory from `work_state root`), as a `## Design` section (or a sibling `design.md` if the spec is already long), so it lives next to the story's plan and task notes:
+Write a static design artifact at the path supplied by the main session/user or the repository's established architecture convention. It can be a `## Design` section in a story spec, a standalone `design.md`, or an epic architecture artifact. Do not assume a specific project store or task-note path.
 
 ```markdown
 ## Design
 
 ### Scope
-In: … | Out: … | Stakeholders: … | Context diagram
+In: … | Out: … | Stakeholders: …
 
 ### Components
-| Component | New/changed | Owns | Serves |
+| Component | Change | Owns | Serves |
 
 ### Flows
-Sequence diagrams, each hop labelled sync/async, each flow critical/background
+Sequence diagrams; sync/async and critical/background labels
 
 ### Data
-| Entity | Owner | Readers | Retention/regulatory | Migration |
+| Entity | Owner | Readers | Retention | Migration |
 
 ### NFR mechanisms
 | NFR | Target | Mechanism | Verification |
@@ -136,66 +127,54 @@ Sequence diagrams, each hop labelled sync/async, each flow critical/background
 | Dependency | Timeout | Retry/backoff | Consistency |
 
 ### Security
-AuthN, AuthZ/tenant scoping point, trust boundaries, never-logged fields
+AuthN/AuthZ, trust boundaries, sensitive fields
 
 ### Deployment and rollout
-Environments and their differences, deployment model, CI/CD shape, flag, migration order, staged rollout
+Environments, deployment model, CI/CD, flags, migration/rollout
 
 ### Shared contracts
-#### C1 API
-… method, path, request and response examples
-#### C2 Schema
-#### C3 Status transitions
-#### C4 Failure policy
+#### C1 <Contract name>
+Concrete contract details and examples
 
 ### Decisions
-ADR links, alternatives considered
+Alternatives, recommendation, ADR links
 ```
 
-Give each shared contract a stable id (`C1`, `C2`) so tasks can cite exactly what they depend on, and write it under its own heading (`#### C1 API`) with its examples and tables beneath. That heading's whole section is the contract: `work_state brief` hands a task the section for each id it cites, and the task's approval covers that text, so an edit to any part of it voids the approval. A contract without a heading is read as the paragraphs that mention its id. Every component, flow, and contract should trace to at least one `FR`/`NFR` id; an element that traces to nothing is scope creep.
+Trace each design element to one or more `FR`/`NFR` IDs; anything tracing to nothing is potential scope creep. The artifact is static approved context for worker briefs, not live task progress.
 
-**At epic level**, write the architecture into the epic's `[epics-dir]/[epic-id]/epic.md` (`docs/epics/[epic-id]/epic.md` in the repo store) under `## Architecture`, with the same sub-sections, and give each contract that several stories share an id with an `E` (`E1`, `E2`). Stories keep `C1…` for their own contracts. A task cites either kind in its `design_refs` (`work_state field [story-id] [task-id] design_refs "C1, E2"`), and `work_state brief` and the task's approval read an `E` id from the story's parent epic.
+## Keep design aligned
 
-**Keep the design alive.** When implementation reveals the design was wrong, update the `## Design` section together with the code: in the repo store, in the same pull request; in the vault store, which isn't in git, before that pull request merges, with a `work_state log` line on the task naming the pull request. A design that disagrees with the code is worse than no design. Tasks were approved against the old text of a contract, so changing one has a fixed follow-up: once the user approves the change, record it (`work_state approve-phase [story-id] design`), run `work_state cites [story-id] [contract-id]` to list the tasks that cite the contract with their status (for an epic's `E` id, run it for each story of the epic), and re-gate each of them that isn't done: their approvals are void until they pass the gate again (`low-level-design`, step 7). A task already built against the old contract needs a new task to change it.
+When implementation proves the design wrong, stop affected work and use the user gate to approve a revised design. Update the static artifact and affected worker briefs before resuming; main owns ordering and file reassignment. Do not use a task-status board to discover dependents. The repository's current system architecture should be updated using its existing convention when the system shape changes.
 
-**Keep the system design in the repo.** The story's `## Design` records one change; the repository keeps the system's current shape in `docs/architecture/hld-<system>.md` (one per deployable system; create it with the first story that touches the system). Before the story's last pull request merges, fold the shape layer of the approved design into it, in that pull request: components and what each owns, the main flows with their sync/async labels, data ownership and retention, integrations, security boundaries, and deployment. Never copy the shared contracts or task detail into it; link the ADRs instead. This file lives in git even when the story lives in the vault, so the system's architecture is reviewed in pull requests and stays next to the code. It holds architecture only, never personal or patient data.
+Before the final implementation change is merged, update the repository's current system-architecture document with the approved shape, ownership, flows, security boundaries, and rollout. Keep shared-contract detail in its authoritative design artifact and link it rather than duplicating it. After a contract changes, the main session identifies every affected task and obtains fresh approval before that task resumes; a previous task approval does not cover revised contract text.
 
 ## Common Rationalizations
 
 | Rationalization | Reality |
 |---|---|
-| "The design is obvious, I'll just plan the tasks" | Then writing it down takes ten minutes. If it isn't obvious, the tasks will each decide it differently. |
-| "We'll figure out retries and duplicates during implementation" | Then every task makes a different call. Idempotency and failure policy are contracts, not details. |
-| "The NFRs are listed in the spec, that covers them" | A target without a mechanism is a wish. Name the cache, index, queue, or check that meets it. |
-| "Only one sensible option exists" | Then comparing two takes one paragraph. Usually a cheaper option was never considered. |
-| "Full schema and class diagrams make the design complete" | They make it unreadable and stale by next week. Record only what more than one task depends on. |
-| "The design doc is done, the code is the truth now" | When they disagree, the next person trusts the wrong one. Update the design, and the repo's system design, in the same PR. |
+| “The architecture is obvious.” | Record it so separate tasks do not make incompatible choices. |
+| “The NFR target is enough.” | A target without a mechanism and verification is unmet. |
+| “An implementer can decide the failure path.” | Shared failure behavior must be settled before dependent tasks start. |
+| “The old task approval still applies.” | Changed shared contracts require review of affected tasks and fresh approval. |
 
 ## Red Flags
 
-- An NFR restated as a target with no mechanism beside it
-- No out-of-scope list
-- A flow with no sync/async label, or a user waiting on something marked async
-- A status field that more than one task writes, with no transition table
-- A shared boundary with no stated idempotency or retry rule
-- The shape layer reads like code: class names, full DDL, every edge case
-- A new component where extending an existing one would do, with no reason given
-- A design element that traces to no requirement id
-- Tasks planned before the design was approved
-- A `## Design` over about 200 lines: the story is too big, or task-local detail has crept into the shared contracts. Split the story, or move what a single task needs down to its low-level design
-- A story merged with a changed system shape and an unchanged `docs/architecture/hld-<system>.md`
+- A component, flow, or contract has no requirement it serves.
+- Several writers own the same data without a consistency rule.
+- A shared lifecycle omits invalid transitions or terminal states.
+- Security, failure ownership, or NFR verification is deferred to implementation.
+- Code diverges from the approved design or the repository architecture stays stale.
 
 ## Verification
 
-- [ ] Every FR and NFR id maps to at least one design element, and every element traces back to one
-- [ ] Out-of-scope is written down
-- [ ] Every flow hop is labelled sync/async and every flow critical/background
-- [ ] Every NFR has a mechanism and a verification method
-- [ ] Data ownership and retention are stated for every entity touched
-- [ ] Every contract shared by two or more tasks has a stable id and concrete examples
-- [ ] Every status field has a transition table with decided invalid-transition behaviour
-- [ ] At least two alternatives were compared for hard-to-reverse decisions, and ADRs are recorded
-- [ ] A fresh-context doubt pass ran and its findings were resolved
-- [ ] The human approved the design before task planning started
-- [ ] Environments, deployment model, and CI/CD shape are stated for every new or changed component
-- [ ] The repo's `docs/architecture/hld-<system>.md` is updated with the shape layer before the story's last pull request merges
+- [ ] Every requirement maps to a design element and every element traces to a requirement.
+- [ ] Scope and out-of-scope are explicit.
+- [ ] Every flow hop is sync/async and each flow is critical/background.
+- [ ] Every NFR has a mechanism and verification.
+- [ ] Data ownership, readers, retention, and migration are clear.
+- [ ] Shared contracts have stable IDs and concrete examples; status rules include invalid transitions.
+- [ ] Alternatives and expensive-to-reverse decisions were examined.
+- [ ] Security, deployment, rollout, and failure ownership are explicit.
+- [ ] Fresh-context doubt review findings are resolved.
+- [ ] The user approved the design before planning.
+- [ ] The static artifact and task briefs do not duplicate mutable progress.

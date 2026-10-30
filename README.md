@@ -5,9 +5,9 @@
 Skills encode the workflows, quality gates, and best practices that senior engineers use when building software. These ones are packaged so AI agents follow them consistently across every phase of development.
 
 > **This is a fork** of [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills), maintained at [tung-dnt/agent-skills](https://github.com/tung-dnt/agent-skills). It adds:
-> - design skills (`high-level-design`, `low-level-design`) that give each scope of work (epic, story, task) its own workflow
-> - task notes in the Obsidian project-manager format, safe for parallel sessions, with git-lock claims and `/resume` after a closed session
-> - a multi-agent `/build` pipeline (builds start while you review the next design) and `/build auto`, which route each piece of work to the cheapest model tier that can do it well
+> - high- and low-level design skills with explicit requirements, contract, and user-approval workflows
+> - a native-first task workflow: native todo is the main session's progress list, native task runs workers, and static artifacts carry the handoff
+> - verification evidence for registered work without advertising unregistered work as hard-verified
 >
 > See [What this fork adds](#what-this-fork-adds).
 
@@ -27,6 +27,12 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 
 ---
 
+## Unreleased
+
+- **Breaking:** lifecycle workflows no longer use task-note status, project claims, or a task-store CLI. Existing board data is not migrated or deleted automatically; see the [adoption guide](docs/adoption-guide.md).
+- **Added:** opt-in Git-candidate verification through the native `verification` tool and `/verification`, with user-approved scope/checks, real child outcomes, resource-generation freshness, and protected native todo transitions.
+- **Preserved:** requirement/design briefs, user approval gates, Jev routing, knowledge/memory integrations, and unrelated hooks.
+
 ## Commands
 
 14 slash commands that map to the development lifecycle. Each one activates the right skills automatically.
@@ -34,13 +40,13 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 | What you're doing | Command | Key principle |
 |-------------------|---------|---------------|
 | Plan an epic or a new project | `/epic` | Intent, requirements, architecture, story map |
-| Take a story to an approved plan | `/story` | Resumes at its current phase |
-| Build one task end to end | `/task` | Claim → design note → your approval → subagents build and review |
+| Take a story through an approved plan | `/story` | Requirements → design → static plan |
+| Build one task end to end | `/task` | User gate → approved LLD for every planned task → test-first build → review |
 | Stress-test a plan or decision | `/grill-me` | Settle every branch before acting |
 | Define what to build | `/spec` | Spec before code |
-| Plan how to build it | `/plan` | Small, atomic tasks |
-| Build incrementally | `/build` | Builds start while you review the next design |
-| Pick up after a closed session | `/resume` | State lives in files, not chat |
+| Plan how to build it | `/plan` | Small, ordered worker briefs |
+| Build incrementally | `/build` | Main owns order and file ownership; native task workers execute |
+| Resume available work | `/resume` | Current native session + accessible static artifacts |
 | Prove it works | `/test` | Tests are proof |
 | Set the quality bar | `/constraints` | Decide it once, enforce it everywhere |
 | Review before merge | `/review` | Improve code health |
@@ -50,7 +56,7 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 
 In Claude Code these install as plugin commands. Where a built-in command has the same name, as `/review` does, use the namespaced form: `/agent-skills:review`.
 
-`/build` on a story with several tasks runs a **pipeline**: you review each task's design in plan order, and a task's builder starts in the background as soon as its design is approved, so builds run while you review the next design. Want fewer manual steps once the spec exists? **`/build auto`** generates the plan and implements every task in a single approved pass — you approve the plan once, then it runs autonomously. It removes the human stepping *between* tasks, not the verification: every task is still test-driven and committed individually, and it pauses on failures or risky steps.
+`/build` implements approved work using native task workers when useful. The main session owns the current native todo, user gates, task order, and exact file ownership. Every worker receives static artifact paths and explicit acceptance criteria; workers run focused checks, and one main integration owner runs required full, integration, and runtime checks at stable boundaries. See [docs/native-task-workflow.md](docs/native-task-workflow.md).
 
 Skills also activate automatically based on what you're doing — designing an API triggers `api-and-interface-design`, building UI triggers `frontend-ui-engineering`, and so on.
 
@@ -60,74 +66,45 @@ Skills also activate automatically based on what you're doing — designing an A
 
 ### A workflow for each scope of work
 
-`/epic`, `/story`, and `/task` run these workflows. Every planning phase ends in a recorded approval, and nothing is built until `work_state` confirms that approval still matches the files. They work with or without a tracker: a ticket key or URL is read as input, and without a tracker the repository's folders are the tracker.
+`/epic`, `/story`, `/task`, `/build`, and `/resume` combine explicit user gates with native progress and static artifact handoffs:
 
 ```mermaid
 flowchart TD
-    R[Request] --> SC{Scope check<br/>+ Jev shadow}
-    SC -->|epic| E[/epic: interview → epic.md → architecture E1… → story map/]
-    SC -->|story| S1
-    SC -->|task| T0[/task: one-task story/]
-    E --> S1
-    subgraph Story ["/story — resumes at the phase `work_state` reports"]
-      S1[Spec: FR/NFR + testable AC] --> G1{Show result → ask approval<br/>approve-phase spec}
-      G1 --> S2[High-level design: 11 steps, checkpoints after 1, 5, 9<br/>shared contracts C1…]
-      S2 --> G2{Fresh-context review → show result → ask approval<br/>approve-phase design}
-      G2 --> S3[Plan: plan.md + one task note per task]
-      S3 --> G3{Show result → ask approval<br/>approve-phase plan}
-    end
-    G3 --> T1
-    T0 --> T1
-    subgraph Task ["/task or /build — once per task"]
-      T1[next → claim lock] --> T2[Investigate: bugs only, checkpoint]
-      T2 --> T3[Low-level design: 6 steps, checkpoint after step 1]
-      T3 --> G4{Show result → ask approval<br/>approve task}
-      G4 --> T4[task-builder: rechecks approval, builds test-first<br/>→ status review]
-      T4 --> T5[code-reviewer + security-auditor when it applies]
-      T5 -->|Critical/Important| T4
-      T5 --> T6[done → commit → merge → release lock]
-    end
-    T6 -->|next task| T1
+    R[Request] --> SC{Scope check}
+    SC -->|epic| E[Requirements → architecture → ordered story map]
+    SC -->|story| S[Approved requirements → design/contracts → static plan]
+    SC -->|task| T[Approved brief/design → focused implementation]
+    E --> S
+    S --> T
+    T --> W[Native task worker when useful]
+    W --> I[Main reviews actual changes and runs required integration checks]
+    I --> D[Main updates native todo based on observed results]
 ```
 
-| Phase | Command | Produces | Approval recorded as |
-|---|---|---|---|
-| Scope check | every command | epic, story, or task | Your confirmation when the scope looks wrong. Jev logs its guess but doesn't act on it |
-| Epic | `/epic` | `epic.md`, `## Architecture` (`E1…`), story stubs | `summary.md`; its stories stay at phase `spec` until `/story` |
-| Spec | `/story` | `spec.md` with `FR`/`NFR` ids | `spec_approved` in the story note's frontmatter |
-| High-level design | `/story` | `## Design`, shared contracts `C1…` | `design_approved`, or recorded as skipped |
-| Plan | `/story` | `plan.md` + `_tasks/*.md` | `plan_approved` (covers the plan and the list of task ids) |
-| Task design | `/task` | the task's `## Design` (5–15 lines) | the task's `design_approved` (covers its description, design, and the text of each contract it cites) |
-| Build | `task-builder` | code and tests, status `review` | — |
-| Review → done | main session | `done`, merge, lock released | — |
+| Phase | Main artifact/progress | Approval/evidence |
+|---|---|---|
+| Requirements | Static spec with testable `FR`/`NFR` criteria | Explicit user gate |
+| Design | Static architecture/contracts with stable IDs | Explicit user gate and fresh-context critique where required |
+| Plan | Static ordered plan and bounded worker briefs | Explicit user gate |
+| Execution | Native todo for this main session; native task for worker execution | Worker output is not test proof |
+| Verification | Candidate-scoped receipts for registered work | `begin`, `run`, `status`, `complete`, `cancel`; approval remains user-facing |
+| Integration | Main-owned required full, integration, and runtime/browser checks | Report only observed results |
 
-**Every gate** ([references/approval-gate.md](references/approval-gate.md)):
-1. A one-screen **catch-up summary** (Business context · Proposed fix fit · Root cause for bugs · Recommendation · Open decisions), saved to `[stories-dir]/[story-id]/summary.md` or the task note's `## Summary`.
-2. **`grill-me` rounds** until nothing is open; each round is one `ask` dialog.
-3. **Show the result, then ask for approval in the same chat:** in omp, the agent shows the phase result and artifact path (plus a task's design verbatim), then opens an `ask` dialog with Proceed / Revise. No plan-mode toggle or Plan Review submission is required. Other hosts use their available question mechanism.
-4. The go-ahead is **recorded** with `approve` / `approve-phase`.
+**Every planning/design gate** follows [references/approval-gate.md](references/approval-gate.md): show a catch-up summary and the relevant artifact, grill open decisions, then wait for explicit user approval. Do not treat a todo item, task completion, imported note, or model argument as approval.
 
-Before the gate, `/story` and `/task` stop at a **step checkpoint** after the investigation and at a few design checkpoints (three in a story's design, one in a task's), so you steer the design before the gate. `/build auto` and "don't stop" skip the checkpoints and pass one gate over every task design. The `/build` pipeline keeps every checkpoint and gate and overlaps them with the builds: the designs are drafted in parallel up front, and each one still gets its checkpoint and gate. On a large story (more than about five tasks, or several repos) it uses **slice gates** instead: one gate per repo-sized slice, showing every task design in it, then each task is approved on its own record.
+**What makes the handoff reliable:**
+- **One mutable progress owner.** The main session uses native todo; no Markdown task-status copy, vault task store, or replacement project JSON board is created.
+- **Static context.** Specs, designs, plans, decisions, and worker briefs are passed by absolute path. They are not edited as a second progress tracker.
+- **Main-owned coordination.** The main session chooses order, dependencies, and one owner per shared file. There is no project-wide claim, lock, automatic DAG readiness, or conflict-detection guarantee.
+- **Bounded workers.** Native task execution receives one approved task and explicit allowed paths, runs focused checks, and reports exact evidence and unrun checks.
+- **Per-task design gate.** Every task from a written plan gets a user-approved low-level design before code, even if mechanical; concise notes and explicit repo-slice approvals are allowed, silent skips are not.
+- **User-only approval.** Policy/scope approval is obtained through the supported user-facing interaction, never a model-supplied flag.
+- **Evidence is distinct.** Registered work uses the verification interface; `complete` records evidence and does not set todo progress. Native task completion is not proof. Unregistered work is not advertised as hard-verified.
+- **Honest resume.** `/resume` uses current native session state, accessible worker output, static artifacts, and repository state; it cannot promise recovery of another session's checklist or ownership.
+- **Quality gates remain.** Workers run focused checks. The main integration owner runs required full-suite and project-required runtime checks at stable boundaries without waiving quality criteria.
+- **Other capabilities remain independent.** The Jev shadow pilot, skill routing, knowledge-base/memory behavior, and unrelated hooks keep their existing roles.
 
-**What makes the tasks reliable:**
-- **No building on a draft.** `phase` advances only on a recorded approval of an unchanged file. Editing an approved spec, design, or plan voids its approval.
-- **No building on a stale contract.** Changing a contract voids every task design that cites it; `work_state cites STORY C3` lists them so each goes through its gate again.
-- **Checked twice.** The orchestrator runs `approved` before starting a builder, and the builder runs it again; if it fails, the builder reports `blocked`.
-- **One owner per task.** The claim is a git lock (see below), so no two sessions, worktrees, or machines take the same task.
-- **Safe parallel builds.** `/build` and `/build auto` start a task only when `work_state ready` lists it: its design approved and unchanged, its dependencies done, and no file in common with a running task (lockfiles and generated outputs count). Each task gets its own worktree.
-- **Builder limits.** Test-first, commits only its own paths, never changes a shared contract, and stops with `blocked`, `failed`, or `needs-command` instead of guessing.
-- **`done` means reviewed.** A task whose acceptance criteria pass goes to `review`; it is `done` only after code review (plus security review for auth or personal data) passes.
-- **Resumable.** Status, `## Log` lines, claims, and worktrees are on disk; `/resume` rebuilds where each task stopped.
-- **Fresh sessions at boundaries.** After each `/story` gate and each build wave, the session logs what is next, names the exact next command, and recommends continuing in a new session: orchestrator sessions measured a 364–395k-token median context, and nothing the next step needs lives in it ([references/model-routing.md](references/model-routing.md)).
-- **Measured before trusted.** An optional [Jev shadow pilot](hooks/JEV-SHADOW.md) logs TypeSafe Jev's answer at each checkpoint and scope check next to what actually happened, without acting on it, so a threshold for skipping checkpoints can be set from data (`jev.sh report`).
-
-**Stops:** a story stops 6 times before building (spec gate, three design checkpoints, design gate, plan gate) and twice per task (one design checkpoint, then the gate), or once per slice on a large story. `approve` refuses a task design over 15 lines unless you chose to keep the task whole (`--allow-long`). **Known weak spot:** an epic's approval lives only in its `summary.md`.
-
-### Work state, parallel sessions, and `/build auto`
-
-**Requires omp.** The `/epic`, `/story`, `/task`, `/build` and `/resume` workflows run on the `work_state` tool, which this plugin registers through its omp extension (`package.json` → `omp/index.ts`). Install with `omp plugin install agent-skills@tung-agent-skills` and restart the session. On other hosts the skills still work by name, but these workflows don't.
-
-Story and task notes live in your Obsidian vault (or `docs/stories` in the repo), claims are git locks so parallel sessions and machines never take the same task, `/resume` rebuilds where work stopped, `work_state ready` lists the tasks that can build together, `/build` starts each task's builder as its design is approved, and `/build auto` runs the whole plan after one approval, with task builders in parallel worktrees on the cheapest model tier that can do the job. Details: **[docs/work-state-and-parallel-builds.md](docs/work-state-and-parallel-builds.md)** and [references/work-artifacts.md](references/work-artifacts.md).
+Details: [Native Task Workflow](docs/native-task-workflow.md), [Work Artifacts and Native Progress](references/work-artifacts.md), and [Approval Gate](references/approval-gate.md).
 
 ---
 
@@ -149,12 +126,12 @@ npx skills add tung-dnt/agent-skills --skill test-driven-development   # red-gre
 ```
 
 > **Installing one skill?** A per-skill `npx` install copies only
-> `skills/<name>/`, not the repo-level `references/` directory. The skill still
-> works, but paths to supplementary shared checklists are unavailable, and so is
-> the `work_state` tool (the reference describes the manual git fallback). Use a
-> whole-repo integration, clone the repository, or copy the needed checklist into
-> a `references/` directory inside the installed skill. This portability gap is
-> tracked in [#361](https://github.com/addyosmani/agent-skills/issues/361).
+> `skills/<name>/`; shared references are unavailable unless you add them or
+> install the whole repository. The skill can still guide static specs and
+> designs, but does not add OMP's native todo/task or verification tools. Do not
+> assume project-wide task state, claims, or verification from a per-skill install.
+> See [#361](https://github.com/addyosmani/agent-skills/issues/361) for the
+> supplementary-reference portability gap.
 
 Prefer a native integration? Pick your tool below.
 

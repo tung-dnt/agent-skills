@@ -30,17 +30,18 @@
     {
       "id": 1,
       "prompt": "Break the attached notifications spec into an executable plan.",
-      "expected_output": "A story plan at docs/stories/<story-id>/plan.md with an ordered task index, plus one task note per task under its _tasks/ folder, each small, verifiable, with acceptance criteria and dependencies",
+      "expected_output": "A static story plan at a path agreed with the user, with an ordered task index and one static worker brief per task; native todo is the main session's only mutable progress list",
       "files": [
         "planning-and-task-breakdown"
       ],
       "expectations": [
-        "Every task has acceptance criteria",
-        "Tasks are ordered by dependency",
+        "Every task has concrete, testable acceptance criteria",
+        "Tasks are ordered by explicit dependencies and implementation risk",
         "Tasks are vertical slices rather than horizontal layers",
         "No implementation code is written during planning",
-        "The plan is saved under docs/stories/<story-id>/ and one task note per task is created under its _tasks/ folder through work_state new-task (status todo, dependencies listed), not hand-written frontmatter",
-        "Task status is recorded only in the task notes; plan.md holds an index without checkboxes to tick"
+        "The static plan and each worker brief are handed off by path and include acceptance criteria, dependencies, exact owned paths, and focused verification; the main session explicitly owns ordering and shared-file assignment",
+        "Mutable progress is represented only in the current main session's native todo/task state, not in Markdown task-status notes, a project JSON store, or a duplicate board",
+        "No project-wide claim, lock, automatic DAG readiness, or cross-session ownership guarantee is claimed"
       ]
     }
   ]

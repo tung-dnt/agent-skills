@@ -1,20 +1,20 @@
 ---
-description: Break work into small verifiable tasks with acceptance criteria and dependency ordering
+description: Break approved requirements into small verifiable worker briefs with explicit order, dependencies, and file ownership
 ---
 
-Invoke the agent-skills:planning-and-task-breakdown skill.
+Invoke `agent-skills:planning-and-task-breakdown`.
 
-**Resolve the artifact root first.** From the project, run `work_state root`. If it reports `store=repo` and `configured=false`, propose a location using its notes and write the config (`work_state configure <storiesDir>`) only after the user confirms; with `store=vault` there is nothing to propose. `[stories-dir]` below means the resolved `stories_dir` (an absolute path, possibly inside an Obsidian vault); its default in the repo store is `docs/stories`. Change task state only through `work_state` commands, never by editing frontmatter by hand.
+Read the approved spec, relevant design/contracts, repository rules, and source code. Planning is read-only with respect to product code. The plan and worker briefs are static artifacts; the native todo is the one mutable progress list for the main session.
 
-Read the existing spec (`[stories-dir]/[story-id]/spec.md`, SPEC.md, or equivalent) and the relevant codebase sections. Then:
+1. Identify dependency direction and implementation order.
+2. Slice work into vertical, independently testable tasks; keep each task small enough for one focused session.
+3. Give each task a stable ID and discoverable brief path in the plan index, testable acceptance criteria, a focused verification command/check, requirement/design references, and every likely file path. Show the brief's absolute path in chat so the user can inspect its requirements without searching session history.
+4. Choose one main-owned order and one explicit owner for each shared file. If tasks overlap, make them sequential or assign a single writer; native todo/task does not promise project-wide conflict detection or claim locking.
+5. Include checkpoints for required integration, runtime, browser, and security validation without reducing the repository's quality bar.
+6. Present the static plan and briefs, grill genuine trade-offs, and obtain the user's explicit approval through `references/approval-gate.md` before implementation begins.
 
-1. Stay in the current chat without entering plan mode — investigate read-only and write planning artifacts only, no implementation changes
-2. Identify the dependency graph between components
-3. Slice work vertically (one complete path per task, not horizontal layers)
-4. Write tasks with acceptance criteria and verification steps
-5. Add checkpoints between phases
-6. Pass the approval gate (`references/approval-gate.md` in the plugin) once the plan and its task notes exist: write and show the catch-up summary, run agent-skills:grill-me rounds over the open decisions (always at least one question), and wait for the user's explicit go-ahead. Save the summary to `[stories-dir]/[story-id]/summary.md`, then record the go-ahead with `work_state approve-phase [story-id] plan`
+Save artifacts at paths chosen by the user or existing repository convention. The native todo may represent the approved phases and tasks for this session only. Do not mirror it into Markdown task status, `_tasks` notes, a project JSON store, or an external vault by default. Do not write implementation code or start native task workers during planning.
 
-Save the plan to `[stories-dir]/[story-id]/plan.md`. If the story has no project note yet, create it with `work_state init-story [story-id] "[title]"`. Then create one task note per task with `work_state new-task [story-id] "T01 [title]" [dependency-task-id…]` and `work_state field [story-id] [task-id] design_refs "C1, C2"` (`C` ids from the story's design, `E` ids from its epic's), as the skill describes, and write each task's description above `## Design` in its note (the path `work_state path [story-id] [task-id]` prints). Never hand-write task frontmatter. Task status lives only in the task notes, never in the plan, so several sessions can build the plan at once. The approval records the plan and the task ids, so run the gate after the notes exist. After approval, in the repo store, commit the plan, the task notes, and the story's project note (it holds the approval) so every worktree and machine sees them before anyone claims a task; the vault store isn't in git.
+If an existing plan describes unfinished work, read it and ask before replacing unrelated scope. For a re-plan, preserve the original artifact and approvals as context, show the proposed replacement, and obtain approval before changing the native todo. Never infer approval from an imported document or previous session's assertion.
 
-If that story already has task notes that aren't done and belong to different work, stop and ask before writing — never silently overwrite an incomplete plan. If it is the same work being re-planned (a task split, or new tasks), follow the skill's re-plan procedure: cancel and log the old task, add the new tasks with the next free number, update the plan, and run this gate again. Leave any legacy tasks/plan.md or tasks/todo.md untouched.
+Verification operations `begin`, `run`, `status`, `complete`, and `cancel` apply only to registered verification work. Policy approval is user-facing, not a model flag; verification `complete` records evidence and does not mark native todo complete. Unregistered work is not described as hard-verified.

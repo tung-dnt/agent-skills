@@ -94,7 +94,7 @@ Skills are user-invocable by default, so once they're discovered the whole lifec
 | Workflow | Copilot invocation | Notes |
 |----------|--------------------|-------|
 | Define | `/spec-driven-development` | Writes a structured spec before code |
-| Plan | `/planning-and-task-breakdown` | Produces `[stories-dir]/[story-id]/plan.md` and one task note per task (created with `work_state new-task`) |
+| Plan | `/planning-and-task-breakdown` | Produces a static ordered plan and worker briefs; no `_tasks` status board or `work_state` setup |
 | Build | `/incremental-implementation` | Pair with `/test-driven-development`; one slice at a time |
 | Verify | `/test-driven-development` | Red-green-refactor, Prove-It for bugs |
 | Review | `/code-review-and-quality` | Five-axis review |
@@ -112,7 +112,7 @@ Natural language is the fallback, and works in any Copilot surface whether or no
 
 VS Code's extension-host local agents support [prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files) at `.github/prompts/<name>.prompt.md`, and each becomes a `/<name>` slash command. The Agent Host does **not** use prompt files — there, use the skill names above.
 
-An alias is a thin shortcut to one skill, nothing more. These aliases do not implement the orchestration in this repo's Claude Code commands — `/build auto`'s single-approval plan-and-implement pass and `/ship`'s parallel persona fan-out. Reproducing that on Copilot is its own piece of work, not something a one-file alias covers. Prefer the skill names as your default; reach for aliases only if the short form is worth the extra file.
+An alias is a thin shortcut to a skill, not an orchestration or state-transport feature. These prompt files do not add OMP's native task or verification tools; use only capabilities the active host actually exposes. Never imply cross-session claims, automatic dependency readiness, or project-wide resume.
 
 Create one, without clobbering an existing file:
 
@@ -139,8 +139,8 @@ For the rest, run the same `mkdir`/`cat` block with the filename swapped (the fi
 
 | Alias file | `description` | Complete body — everything below the frontmatter |
 |------------|---------------|--------------------------------------------------|
-| `.github/prompts/plan.prompt.md` | Break an approved spec into ordered, verifiable tasks | Use the planning-and-task-breakdown skill. Read the spec, then break the work into small, independently verifiable tasks, each with acceptance criteria and explicit dependency order. Save the plan to `[stories-dir]/[story-id]/plan.md` and create one task note per task with `work_state new-task` (the stories directory is what `work_state root` prints as `stories_dir`; `docs/stories` by default in the repo). Write no product code — show me the plan and wait for my approval. |
-| `.github/prompts/build.prompt.md` | Implement the next planned task, test-first | Use the incremental-implementation and test-driven-development skills. Read `[stories-dir]/[story-id]/plan.md` and its task notes, then take the next unclaimed `todo` task and only that one (`work_state next`, then `claim`). Write a failing test first, make it pass, refactor, run the suite, and mark the task `review` with `work_state set`: it is `done` only after I have reviewed it. Stop there and report what changed. |
+| `.github/prompts/plan.prompt.md` | Break approved requirements into ordered, verifiable work | Use the planning-and-task-breakdown skill. Read the approved requirements, relevant design, and code. Write a static plan at a path agreed with the user and one static worker brief per task with acceptance criteria, dependencies, exact owned paths, and focused verification. Do not write product code, create `_tasks` notes or a project task store, call `work_state`, or claim project-wide readiness. Show the plan and wait for explicit user approval. |
+| `.github/prompts/build.prompt.md` | Implement one approved task, test-first | Use the incremental-implementation, low-level-design, and test-driven-development skills. For every task from a written plan, write and obtain explicit user approval for its LLD before code, even if the change looks mechanical; concise notes or a user-approved slice gate showing every design are allowed. Read the exact approved static brief path; implement only the bounded task and allowed files. Run focused checks and report exact commands/results plus required full/integration/runtime checks not run. The main session owns task order, shared-file ownership, user gates, and integration. Do not write task status to a separate board or treat native task completion as test proof. |
 | `.github/prompts/test.prompt.md` | Write tests before the code that satisfies them | Use the test-driven-development skill. For new behavior, write a failing test that captures it before any implementation. For a bug, reproduce it with a failing test first, then fix it. Run the suite after each step and show me the red and the green output. |
 
 Write the body yourself, or take it from this table, rather than copying `.claude/commands/*.md` verbatim: those files reference skills as `agent-skills:<name>`, a Claude Code plugin namespace that means nothing to Copilot.

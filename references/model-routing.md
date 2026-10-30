@@ -7,9 +7,9 @@ This extends `orchestration-patterns.md`; its rules still hold. The user or a sl
 ## Principles
 
 1. **The main agent orchestrates.** It keeps decisions, artifact paths, and short summaries. Reading-heavy and well-specified work goes to subagents.
-2. **Artifacts on disk carry the context.** A subagent receives paths (a story id, a task id, a worktree) rather than pasted content. It reads what it needs, writes detail to files (the task's `## Log`, a review file), and returns a short summary.
-3. **Gates stay in the main thread.** Only the main thread can ask the user. Subagents draft and build; approval happens at the gate (`approval-gate.md`).
-4. **Scripts before models.** Deterministic work costs no tokens: the `work_state` tool resolves paths, picks and claims tasks, renders status, and packs a task's context (`brief`). Never ask a model to do what the script does.
+2. **Static artifacts carry design context.** A worker receives the repository root, absolute scope/design/brief paths, exact allowed files, acceptance criteria, and checks rather than a pasted transcript. Static artifacts hold requirements and decisions, never mutable status.
+3. **Gates stay in the main thread.** Only the main thread can ask the user. Workers may investigate, draft, or build; approval happens through the user-facing gate (`approval-gate.md`).
+4. **Native task tools own execution.** The main session owns native todo progress, order, and file assignment; native task owns worker execution/output. Do not invent a project board, claim service, or automatic readiness layer.
 5. **Route by judgment, escalate on failure.** Start each piece at the cheapest tier that can do it well. If it fails, move up a tier and pass a summary of the failure, never the whole transcript.
 
 ## Tiers
@@ -19,8 +19,8 @@ The main thread runs on whatever model the user selected. Routing never override
 | Tier | Runs on | Use for |
 |---|---|---|
 | **Deep** | The main thread's model (`inherit`) | Dialogue with the user (interviews, approvals), high-level design, fresh-context critique of a design, security review of authentication, authorization, or sensitive data, and the retry after a balanced-tier failure |
-| **Balanced** | A mid-size model (Claude Code: `sonnet`) | Building a task that has a low-level design note, writing that note, reviewing one task's diff, drafting ADRs, creating task notes from an approved design |
-| **Fast** | A small model (Claude Code: `haiku`) | Read-only work backed by scripts: `/resume` investigation, codebase search, running tests and triaging their output, collecting status, drafting commit and PR text |
+| **Balanced** | A mid-size model (Claude Code: `sonnet`) | Building one bounded task from its approved static brief, writing a low-level design, reviewing one diff, drafting ADRs |
+| **Fast** | A small model (Claude Code: `haiku`) | Read-only codebase research, `/resume` investigation of accessible native state/artifacts, running focused checks and triaging observed output |
 
 In Claude Code the tier is the `model:` field in an agent's frontmatter, or the model passed when spawning a subagent. Hosts without per-agent models run every tier on the main model; the delegation structure still saves context.
 
@@ -29,30 +29,31 @@ In Claude Code the tier is the `model:` field in an agent's frontmatter, or the 
 | Scope | Stays in the main thread | Delegated |
 |---|---|---|
 | Epic | Interview (subagents can't ask the user), product requirements, story map | Architecture and codebase discovery (fast) · parallel option generation for `idea-refine` (balanced) · critique of the requirements (deep, fresh context) |
-| Story | Requirements, the `## Design` itself, approval gates | Reading the existing architecture (fast) · `doubt-driven-development` critique (deep, fresh context) · creating task notes from the approved design (balanced) |
-| Task | A thin loop: pick, claim, delegate, collect; at a design gate, the checkpoints and the approval | `task-builder` per claimed task (balanced), in parallel for independent tasks · `code-reviewer` per diff (balanced) · `security-auditor` when the task touches auth or sensitive data (deep) · every task's design draft ahead of its review, in the `/build` pipeline (balanced) |
-| Resume | Presenting the result and asking which task to continue | `state-investigator` (fast, read-only) |
+| Story | Requirements, the `## Design` itself, approval gates, static plan and owner assignment | Reading existing architecture (fast) · `doubt-driven-development` critique (deep, fresh context) |
+| Task | Select/order one task, assign paths, approve a low-level design for every written-plan task (including mechanical), and own user gates | `task-builder` for one bounded, approved static brief (balanced) · `code-reviewer` per diff (balanced) · `security-auditor` when auth/sensitive data apply (deep) |
+| Resume | Presenting observations and asking which safe action to take | `state-investigator` (fast, read-only), limited to accessible native session state, worker output, artifacts, and repository |
 
 ## Output Contract
 
 Every delegated job returns at most 15 lines:
 
 ```
-status: done | blocked | failed
+status: completed | blocked | failed | needs-command
 summary: <one or two sentences>
-evidence: <tests run and result, commit sha>
-files: <paths the main thread may want to open>
-next: <the recommended next action, or "none">
+evidence: <exact commands/results actually observed, or none>
+files: <changed paths and useful artifact paths>
+unrun: <required checks not run, or none>
+next: <the recommended main-session action>
 ```
 
-Anything longer goes into a file, and the summary points to it. The main thread opens a file only when a decision needs it. A `task-builder` reports `review` where this says `done`: its task is only done once the review passes (`work-artifacts.md`, "Finishing").
+The main session checks the actual diff and output. A native task completion is an execution outcome, not test evidence. Long reports go into a static artifact only when needed; never write a mutable task log/status file.
 
 ## Parallel Fan-out
 
-- Fan out only over **independent** work: tasks that `work_state ready` lists (approved, dependencies done, no file shared with a running task or with each other), or review dimensions over the same diff.
-- Default to at most **3** concurrent subagents and never more than 5. Parallel runs raise peak spend and rate-limit pressure even while they lower the cost per task.
-- Launch a wave's subagents back-to-back without waiting for results (in one turn where the host allows), so they run concurrently. In `/build auto`, collect all the summaries before starting the next wave. In the `/build` pipeline builders start one at a time, as designs are approved, and run in the background while the main thread reviews the next design; a finished builder frees its slot for the next task `ready` lists.
-- Each builder works in its own worktree on its own claim (see `work-artifacts.md`), so builders never share files or a git index.
+- Fan out only over **independent** work whose dependencies, exact allowed paths, and main-assigned ownership are clear. There is no automatic project-wide readiness or shared-file conflict detection; when unclear, run sequentially.
+- Preserve the existing routing floor: default to at most **3** concurrent workers and never more than 5 where the host supports it. Parallel runs raise peak spend and rate-limit pressure.
+- Launch genuinely independent workers back-to-back when the host permits; the main session still owns each user gate, order, file assignment, and integration. Collect evidence before moving to required integration checks.
+- Give each worker one static brief by absolute path, the allowed paths, and focused verification instructions. Workers do not claim a task through Git or another status board.
 
 ## Subagent Command Rules
 
@@ -73,20 +74,18 @@ The agents in `agents/` carry a copy of these rules. When they change, update ev
 
 ## Fresh Orchestrator at Boundaries
 
-A long-lived orchestrator drags its whole history into every call. Measured on this workflow, the median main context of orchestrator sessions was 364–395k tokens, because single sessions ran for 20–45 hours. Nothing the next step needs is in that history: approvals, task status, logs, claims, and worktrees are on disk. So at a boundary the best move is to start over.
+The native todo and task output are session-scoped. Static scope/design/plan/brief artifacts can be handed off by path, but they are not a substitute for native progress and cannot restore another session's todo, task ownership, or worker output. Resume only when the current native state and the required artifacts are actually accessible.
 
-A **boundary** is a point where what just finished is recorded on disk and the next step needs nothing from the conversation:
+A useful boundary is a user-approved planning phase or a stable implementation point where workers have reported and the main integration owner has observed required checks. It is not proof by itself: task completion, an artifact, or a successful-looking log line does not establish verification.
 
-- a `/story` gate has recorded its approval: `approve-phase` for the spec, the design, or the plan;
-- a build wave is complete. In `/build auto`, every builder of the wave has reported and its task is reviewed, `done`, merged, and released. In the `/build` pipeline, where builders start and finish continuously, the pipeline has gone idle after building: every builder started since the last boundary has reported and its task is merged and released, no builder is running, and `work_state ready` exits 4.
+At a boundary:
 
-At a boundary, in this order:
+1. Read back the current native todo before making protected changes; reconcile after manual edits or rewind rather than guessing.
+2. Keep the approved scope/design/plan at its real static artifact path. Do not add a task status/log/approval mirror.
+3. Tell the user the exact next command and distinguish checks actually run from required checks still outstanding.
+4. Recommend a fresh session only when the host can restore the necessary native session state and artifact paths. If state is unavailable, say what cannot be recovered and ask before taking over or changing ownership.
 
-1. **Log what is next.** `work_state log [story-id] [task-id] "next: <exact command> — <what it does>"` on the task the next step starts from: the first `todo` task after the plan gate, or the last task merged after a wave. Before any task exists (after the spec or the design gate), the recorded approval is the log: `work_state phase [story-id]` names the next phase.
-2. **Tell the user the exact next command:** `/story [story-id]` for the next phase, `/build [story-id]` (or `/build auto [story-id]`) for the next wave, `/resume [story-id]` when a claimed task is still open, `/review` for the whole-story review.
-3. **Recommend a new session** for it, with the reason in one line: this session's context only grows, and the work is safe on disk. In omp, the experimental `new_context` tool, when enabled (`/settings` → Context → Compaction, with the working notes saved through `context_notes` first), opens a fresh context window in the same session instead.
-
-This is a recommendation at a boundary, never an interruption: don't deliver it in the middle of a gate or a checkpoint, and when the user answers to continue, continue here. An interactive flow (`/story`, the `/build` pipeline) ends its message with the recommendation and waits for the reply. An unattended run (`/build auto`) puts it in the wave's status line and carries on.
+This is a recommendation at a boundary, never an interruption in a gate or checkpoint. The main session owns the user conversation, approval, ordering, and integration.
 
 ## Anti-patterns
 

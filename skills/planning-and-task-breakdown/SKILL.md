@@ -1,275 +1,173 @@
 ---
 name: planning-and-task-breakdown
-description: Breaks work into ordered tasks. Use when you have a spec or clear requirements and need to break work into implementable tasks. Use when a task feels too large to start, when you need to estimate scope, or when parallel work is possible.
+description: Breaks work into ordered worker briefs with acceptance criteria, dependencies, verification, and file ownership. Use when an approved spec needs implementable tasks, work has independent slices or shared contracts, or a change is too large for one focused implementation.
 ---
 
 # Planning and Task Breakdown
 
 ## Overview
 
-Decompose work into small, verifiable tasks with explicit acceptance criteria. Good task breakdown is the difference between an agent that completes work reliably and one that produces a tangled mess. Every task should be small enough to implement, test, and verify in a single focused session.
+Decompose approved requirements into small, verifiable tasks. A good plan makes the intended user value, order, acceptance criteria, checks, and changed files explicit before implementation.
+
+The main session is the sole owner of the current native todo, task selection/order, and file ownership. Plans and worker briefs are static context passed by path; they are not mutable status stores. Native task completion is an execution outcome, not proof that code was tested or reviewed.
 
 ## When to Use
 
-- You have a spec and need to break it into implementable units
-- A task feels too large or vague to start
-- Work needs to be parallelized across multiple agents or sessions
-- You need to communicate scope to a human
-- The implementation order isn't obvious
+- A clear spec needs to be broken into implementable tasks.
+- The request has several independent slices, unclear order, or shared contracts.
+- A change is too large for one focused implementation.
 
-**When NOT to use:** Single-file changes with obvious scope, or when the spec already contains well-defined tasks.
+For a single obvious change with no shared contract, use `/task` without adding ceremony.
 
-## The Planning Process
+## Planning process
 
-### Step 1: Read-only Planning
+### 1. Read-only planning
 
-Before writing any code, operate in read-only mode:
+Before changing product code:
+- Read the approved requirements, design/contracts, repository instructions, and relevant source.
+- Reuse the repository's established patterns and note risks or unknowns.
+- If tasks share APIs, schemas, data, or lifecycle rules and no high-level design exists, run `high-level-design` first.
+- Planning produces static artifacts and a native todo proposal only; it does not implement code or launch workers.
 
-- Read the spec and relevant codebase sections
-- Read the approved design if one exists; if the work shares contracts across tasks and no design exists, produce it first with the `high-level-design` skill
-- Identify existing patterns and conventions
-- Map dependencies between components
-- Note risks and unknowns
+### 2. Identify dependencies and order
 
-**Do NOT write code during planning.** The output is a plan document and one task note per task, recorded in the task list target (see Output Files; default `[stories-dir]/[story-id]/plan.md` plus a task note per task under `_tasks/`, with `[stories-dir]` from `work_state root`), not implementation.
+Make prerequisites explicit and order providers before consumers. Use a small dependency table/diagram where it clarifies the work. Avoid cycles; if two slices cannot be separated without redesign, combine them or ask for a design decision.
 
-### Step 2: Identify the Dependency Graph
+Dependencies are part of the approved plan and the main session uses them to choose an order. Do not claim that native todo or task provides automatic project-wide DAG readiness, cross-session status discovery, or claim/lock protection.
 
-Map what depends on what:
+### 3. Slice vertically
 
-```
-Database schema
-    │
-    ├── API models/types
-    │       │
-    │       ├── API endpoints
-    │       │       │
-    │       │       └── Frontend API client
-    │       │               │
-    │       │               └── UI components
-    │       │
-    │       └── Validation logic
-    │
-    └── Seed data / migrations
-```
+Prefer complete user-visible or otherwise independently verifiable paths over horizontal layers.
 
-Implementation order follows the dependency graph bottom-up: build foundations first.
+**Bad:** database, then all API routes, then all UI.
 
-### Step 3: Slice Vertically
+**Good:** a complete registration path, then a complete login path, with explicit shared contracts and dependencies.
 
-Instead of building all the database, then all the API, then all the UI — build one complete feature path at a time:
+Each slice should leave the system in a coherent state and should be small enough to implement and check in one focused session. Put high-risk work early enough to learn from it before dependent work proceeds.
 
-**Bad (horizontal slicing):**
-```
-Task 1: Build entire database schema
-Task 2: Build all API endpoints
-Task 3: Build all UI components
-Task 4: Connect everything
-```
+### 4. Write one static worker brief per task
 
-**Good (vertical slicing):**
-```
-Task 1: User can create an account (schema + API + UI for registration)
-Task 2: User can log in (auth schema + API + UI for login)
-Task 3: User can create a task (task schema + API + UI for creation)
-Task 4: User can view task list (query + API + UI for list view)
-```
-
-Each vertical slice delivers working, testable functionality.
-
-### Step 4: Write Tasks
-
-Each task follows this structure, whether it lands in its own task note or as an item in an external tracker (see Output Files):
+Use the approved artifact path chosen by the user/main session. Include:
 
 ```markdown
-## Task [task-id]: [Short descriptive title]
+# <Task ID> — <Short title>
 
-**Description:** One paragraph explaining what this task accomplishes.
+## Description
+<What this task delivers and why>
 
-**Acceptance criteria:**
-- [ ] [Specific, testable condition]
-- [ ] [Specific, testable condition]
+## Acceptance criteria
+- <Specific, testable condition>
 
-**Verification:**
-- [ ] Tests pass: [the repository's focused-test command]
-- [ ] Build succeeds: [the repository's build command]
-- [ ] Manual check: [description of what to verify]
+## Verification
+- <Focused test/build/manual command and expected result>
 
-**Dependencies and design refs:** recorded in the task note's frontmatter, never typed by hand: dependencies are passed to `work_state new-task` (task ids, or none), and `work_state field [story-id] [task-id] design_refs "C1, E2"` stores the shared contract ids the task cites (`C` ids from the story's design, `E` ids from its epic's architecture), so `/build` can read them.
+## Dependencies and design references
+<Prerequisite task IDs and FR/NFR/C/E contract IDs>
 
-**Files likely touched:**
+## Owned paths
 - `src/path/to/file.ts`
-- `tests/path/to/test.ts`
+- `tests/path/to/file.test.ts`
 
-**Estimated scope:** [Small: 1-2 files | Medium: 3-5 files | Large: 5+ files]
+## Scope
+<In scope, explicitly out of scope, and any known risks>
 ```
 
-List every file the task creates or changes under **Files likely touched**, one backticked path per item, generated files and lockfiles included: `work_state ready` reads that list (and the backticked paths in the task's `## Design`) to keep tasks that share a file out of the same wave.
+Keep every likely changed/generated file in the owned-path list, including lockfiles if relevant. The main session assigns one owner to shared paths and schedules overlapping tasks sequentially. Static briefs do not contain mutable status, checkboxes used as progress, claim metadata, or worker logs.
 
-Don't write the task's internal design here. Just before a task is implemented, its low-level design note is added to the task note with the `low-level-design` skill.
+Each task should have concrete acceptance criteria and a verification step. Preserve requirements and security constraints; do not reduce the project quality bar to fit a task.
 
-### Step 5: Order and Checkpoint
+**Every planned task has a task-level design gate before code.** Invoke `low-level-design` for every task from a written breakdown, including mechanical tasks; a concise LLD is enough. The main session obtains explicit approval per task or through a user-approved repo-sized slice gate showing every included design. Do not skip solely because a task looks trivial. Only an ad-hoc mechanical change with no design decisions may omit LLD.
 
-Arrange tasks so that:
+### 5. Size tasks
 
-1. Dependencies are satisfied (build foundation first)
-2. Each task leaves the system in a working state
-3. Verification checkpoints occur after every 2-3 tasks
-4. High-risk tasks are early (fail fast)
+| Size | Typical scope | Example |
+|---|---|---|
+| XS | One config or function | Add a validation rule |
+| S | One component or endpoint | Add a focused API endpoint |
+| M | One vertical feature path | Registration flow across a few modules |
+| L | Several components | Search with filtering/pagination; review whether it can split |
+| XL | More than one focused session or independent subsystem | Split before implementation |
 
-Add each checkpoint to the task list target as a task of its own, depending on the tasks it gates, so it is claimed and completed like any other task. A checkpoint makes no decisions, so its `## Design` is one line naming the commands and checks it runs, and it is approved together with the slice or batch it closes instead of at a gate of its own:
+Split a task when it would need multiple focused sessions, has more independent acceptance criteria than can be reviewed together, crosses unrelated subsystems, or the title repeatedly uses “and.” Do not split shared-contract work without first revisiting the design.
 
-```markdown
-## Task t04-checkpoint-foundation: Checkpoint after t01–t03
-- [ ] All tests pass
-- [ ] Application builds without errors
-- [ ] Core user flow works end-to-end
-- [ ] Review with human before proceeding
-```
+### 6. Order, ownership, and checkpoints
 
-**Planning choices are trade-offs too.** When the slicing or order has real alternatives, put each to the user at the plan gate as a decision brief (`../../references/approval-gate.md`) instead of deciding silently. Typical ones: risk-first vs value-first order, one PR vs several, parallel vs sequential tasks, reuse vs build.
+The plan states an explicit order, dependencies, and an owner for every file shared by tasks. Add focused checkpoints after substantial slices and reserve required full-suite, integration, and runtime/browser validation for the main integration owner at stable boundaries. Do not ask every worker to run a duplicate full suite, and do not omit a required gate.
 
-Before any task is built, the plan passes the approval gate (`../../references/approval-gate.md`): a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead. Run it once the task notes exist, then record it with `work_state approve-phase [story-id] plan`. The approval fingerprints the plan and the ids of the task notes, so adding a task afterwards voids it (see Re-planning and Splitting).
+Parallel workers are appropriate only when dependencies and exact file ownership show no overlap. There is no project-wide claim service or automatic shared-file conflict detector; if ownership is unclear, run sequentially. Main makes the coordination decision.
 
-## Task Sizing Guidelines
+### 7. User approval
 
-| Size | Files | Scope | Example |
-|------|-------|-------|---------|
-| **XS** | 1 | Single function or config change | Add a validation rule |
-| **S** | 1-2 | One component or endpoint | Add a new API endpoint |
-| **M** | 3-5 | One feature slice | User registration flow |
-| **L** | 5-8 | Multi-component feature | Search with filtering and pagination |
-| **XL** | 8+ | **Too large — break it down further** | — |
+When ordering, scope, or architecture has meaningful alternatives, present a decision brief with evidence, trade-offs, what the choice hinges on, and the condition that would change the recommendation. Show the static plan and task briefs at the gate in `../../references/approval-gate.md`, ask the user, and wait for explicit approval before implementation. A generated native todo or imported artifact is not approval.
 
-If a task is L or larger, it should be broken into smaller tasks. An agent performs best on S and M tasks.
+## Output artifacts
 
-**When to break a task down further:**
-- It would take more than one focused session (roughly 2+ hours of agent work)
-- You cannot describe the acceptance criteria in 3 or fewer bullet points
-- It touches two or more independent subsystems (e.g., auth and billing)
-- You find yourself writing "and" in the task title (a sign it is two tasks)
+Use paths supplied by the main session/user or the repository's actual convention. Common artifacts are a requirements spec, high-level design, plan, and individual static worker briefs. They may live in repository docs or another user-selected location. Do not impose a vault path, `_tasks` layout, project task JSON database, mutable status file, or duplicate project board.
 
-## Output Files
-
-Plans follow the per-story layout in `../../references/work-artifacts.md`, which is built so several sessions can work one plan at once. Resolve the store first with `work_state root`, as that reference describes. `[stories-dir]` below is the printed `stories_dir` (in the repo store, `docs/stories` by default; in an Obsidian vault, a folder inside it):
-
-- **Plan document:** Save the plan to `[stories-dir]/[story-id]/plan.md`. It holds the overview, decisions, risks, and an ordered task index. It never records task status, so it stays read-only while tasks are built.
-- **Task list:** Record each task in the **task list target** (defined below).
-
-Each story gets its own directory, so planning a new story never touches another story's plan.
-
-**Never overwrite an incomplete plan.** Before writing into an existing `[stories-dir]/[story-id]/` directory, run `work_state status [story-id]` and check whether any of its tasks are not yet complete (`done` or `cancelled`):
-
-- Same work being replanned (the user asked to revise or extend this plan) → update the plan in place. Keep existing task ids; add new tasks with the next free id; never edit a task note another session has claimed.
-- Different work → **stop and ask.** Choose a different story id rather than reusing one. Do not delete, overwrite, or rename existing task notes on your own.
-- A legacy `tasks/plan.md` or `tasks/todo.md` from an earlier plan is left untouched; new plans go in `[stories-dir]`.
-
-The same rule applies to an external task list target: never bulk-close or delete another plan's open tracker items to make room for new ones.
-
-### Re-planning and Splitting
-
-A task that turns out too big (`low-level-design`, step 7), or work nobody planned, changes the approved plan. The procedure is in `../../references/work-artifacts.md` ("Re-planning and Splitting"); in short:
-
-1. **Retire the old task:** `work_state set [story-id] [task-id] cancelled`, then `work_state log [story-id] [task-id] "split into t07-…, t08-…: [reason]"`. The note stays and its id is never reused. Never do this to a task another session has claimed.
-2. **Add the replacements:** `work_state new-task [story-id] "T07 [title]" [dependency-task-id…]` with the next free T number (one past the highest in the story, cancelled tasks included), then their `design_refs` and descriptions as in the Task List Target. A task that depended on the retired one now sees it as complete: if it must wait for the replacements, retire it the same way and recreate it with them as its dependencies.
-3. **Update the plan in place:** the new rows in order, and `split into …` on the old row.
-4. **Run the plan gate again** and record it with `work_state approve-phase [story-id] plan`. The new task note changed the plan's fingerprint, so the story is back at phase `plan` until then.
-
-### Task List Target
-
-The task list target is where tasks and checkpoints are recorded. It is defined once, here; every other reference in this skill defers to it.
-
-- **Default: one note per task** at `[stories-dir]/[story-id]/_tasks/[task-id].md`, in the format described in `../../references/work-artifacts.md`. One note per task means parallel sessions never write the same file. This is the convention the `/build` command expects; the reference has the full lifecycle and claim protocol. Create the notes with `work_state`, never by hand-writing frontmatter:
-  1. `work_state init-story [story-id] "[Story title]" [epic-id]` creates the story's project note if it is missing (pass the epic id only when the story belongs to an epic).
-  2. For each task, in plan order: `work_state new-task [story-id] "T02 Apply event" [dep-id…]`. The title starts with the plan number; the task id comes from it (`t02-apply-event`). Dependencies are task ids that already exist, so create tasks in dependency order. The command prints `task=[task-id]` and `path=…`.
-  3. Insert the Step 4 structure (description, acceptance criteria, verification, files, scope) into the note at that path, **above** `## Design`. Leave `## Design`, `## Summary`, `## Checklist`, and `## Log` empty.
-  4. `work_state field [story-id] [task-id] design_refs "C3, E1"` records the contracts the task cites: `C` ids from the story's design, `E` ids from its epic's.
-
-  Every task starts as `todo`. Record checkpoints (Step 5) the same way.
-- **External tracker:** if the project's agent rules (`CLAUDE.md`, `AGENTS.md`, etc.) or the user designate an issue tracker (e.g. GitHub Issues, Jira, Linear, `bd`/beads), create one tracker item per task instead of writing task notes. Map the Step 4 structure onto the tracker's fields: acceptance criteria and verification steps in the item body, dependencies via the tracker's linking mechanism (`bd dep add`, "blocked by", etc.). Record Step 5 checkpoints as tracker items too, or as a checklist in the plan document if the tracker has no natural equivalent.
-
-When using an external tracker, note it in `[stories-dir]/[story-id]/plan.md` (e.g. "Tasks tracked in Linear project FOO") so downstream steps and future sessions know where to look, and keep the plan document's Task List section as an ordered index of tracker item IDs or links rather than a duplicate checklist.
-
-Approvals for tracked tasks live in the tracker item, not in task notes, so `work_state approve` and `approve-phase … plan` can't be used for them; External Trackers in `../../references/work-artifacts.md` says where the go-ahead is recorded.
-
-## Plan Document Template
+A compact plan index can look like this:
 
 ```markdown
-# Implementation Plan: [Feature/Project Name]
+# Implementation Plan: <Feature>
 
 ## Overview
-[One paragraph summary of what we're building]
+<What is being built>
 
-## Architecture Decisions
-- [Key decision 1 and rationale]
-- [Key decision 2 and rationale]
+## Decisions and risks
+<Approved choices and unresolved questions>
 
-## Task Index
-Status lives in each task note (`work_state status`), never here. This table is a prose index of the plan.
+## Ordered tasks
+| ID | Deliverable | Brief artifact | Depends on | Owner/paths | Verification |
+|---|---|---|---|---|---|
+| T01 | ... | `artifacts/t01.md` | — | ... | ... |
+| T02 | ... | `artifacts/t02.md` | T01 | ... | ... |
 
-| Id | Task | Depends on | Design refs |
-|----|------|------------|-------------|
-| t01-... | ... | — | C1 |
-| t02-... | ... | t01 | C1, C3 |
-| t03-checkpoint-foundation | Checkpoint: tests pass, builds clean | t01, t02 | — |
-| t04-... | ... | t03 | C2 |
-
-## Risks and Mitigations
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| [Risk] | [High/Med/Low] | [Strategy] |
-
-## Open Questions
-- [Question needing human input]
+## Integration checkpoints
+<Full checks and runtime checks the main integration owner must run>
 ```
 
-When tasks live in an external tracker, the Task Index lists tracker item IDs or links instead of task ids.
+This index is a static planning artifact, not the progress view. The main session keeps actual progress only in native todo and worker execution state.
 
-## Parallelization Opportunities
+Keep each task ID mapped to its brief path in this index, and show the absolute path in the handoff/chat so the user can open the requirement without searching session history. A request to view a task's requirements reads that brief and its cited spec sections, not the entire transcript. Session-local artifacts support the owning session; cross-session or cross-machine context belongs at the user-approved durable location, commonly Git-tracked repository documents. Neither location stores mutable progress.
 
-When multiple agents or sessions are available:
+## Re-planning
 
-- **How:** each session claims a task using the protocol in `../../references/work-artifacts.md`, so two sessions never take the same task or write the same file. Within one session, `/build` and `/build auto` fan independent tasks out to parallel builder subagents (`work_state ready` lists the ones that can start together), following `../../references/model-routing.md`.
-- **Safe to parallelize:** Independent feature slices, tests for already-implemented features, documentation
-- **Must be sequential:** Database migrations, shared state changes, dependency chains
-- **Needs coordination:** Features that share an API contract (define the contract first, then parallelize)
+When work reveals that scope, design, dependencies, or file ownership must change:
+1. Stop affected work and compare the observed issue with approved scope/design.
+2. Explain the change and any consequences; ask the user when approval boundaries or requirements change.
+3. Update the static plan/brief only after approval. Preserve prior context when needed; do not destroy a user's unfinished work or infer approval from historical notes.
+4. Reconcile the current native todo by readback, keeping it as the only mutable progress list. Do not create a migration board or mirror statuses.
+5. Reassign file ownership and order explicitly before workers resume.
+
+## Verification
+
+Before implementation, confirm:
+- [ ] Every task traces to approved requirements and applicable design contracts.
+- [ ] Each task has testable acceptance criteria and a focused verification step.
+- [ ] Dependencies, execution order, and shared-file ownership are explicit.
+- [ ] Every worker has a static brief at a real absolute path and an allowed-path boundary.
+- [ ] Work is sized for one focused session and vertical where practical.
+- [ ] User approval is explicit and not inferred from native task/todo state.
+- [ ] Every task from a written breakdown has a user-approved static LLD before code; concise notes and explicitly approved slice gates are allowed, silent skips are not.
+- [ ] Required full integration/runtime checks and their main owner are identified.
+- [ ] No second mutable task-status tracker has been introduced.
 
 ## Common Rationalizations
 
 | Rationalization | Reality |
 |---|---|
-| "I'll figure it out as I go" | That's how you end up with a tangled mess and rework. 10 minutes of planning saves hours. |
-| "The tasks are obvious" | Write them down anyway. Explicit tasks surface hidden dependencies and forgotten edge cases. |
-| "Planning is overhead" | Planning is the task. Implementation without a plan is just typing. |
-| "I can hold it all in my head" | Context windows are finite. Written plans survive session boundaries and compaction. |
-| "That story's plan is stale, I'll just replace it" | Its unfinished tasks may be mid-build in another session. Overwriting them destroys work state that exists nowhere else. Stop and ask. |
-| "A single checklist is simpler than a note per task" | Until two sessions edit it at once. One note per task is what makes parallel work safe. |
+| “The worker will work out the requirements.” | The brief needs testable acceptance criteria and exact scope before handoff. |
+| “Native task handles dependencies and ownership.” | Main must explicitly order dependencies and prevent shared-file overlap. |
+| “Focused tests passed, so integration is optional.” | The required full gates still belong to the integration owner. |
+| “A small planned task needs no design.” | Every task in a written breakdown needs an approved LLD; it may be concise. |
 
 ## Red Flags
 
-- Starting implementation without a written task list
-- Overwriting a story's plan or task notes that still have unfinished tasks for different work, without asking
-- Recording task status in `[stories-dir]/[story-id]/plan.md` instead of the task notes
-- Writing task notes when the project has designated an external tracker (or scattering tasks across both)
-- Tasks that say "implement the feature" without acceptance criteria
-- No verification steps in the plan
-- All tasks are XL-sized
-- No checkpoints between tasks
-- Dependency order isn't considered
+- A task has no requirement reference, acceptance criteria, or discoverable brief path.
+- The plan is used as a second mutable status list.
+- Parallel tasks own the same file or generated output.
+- Task execution is mistaken for verified completion.
+- Planning omits required integration checks or silently lowers their thresholds.
 
-## Verification
+## See also
 
-Before starting implementation, confirm:
-
-- [ ] Every task has acceptance criteria
-- [ ] Every task has a verification step
-- [ ] Task dependencies are identified and ordered correctly
-- [ ] Tasks are recorded in the task list target (default: one `todo` note per task under `[stories-dir]/[story-id]/_tasks/`, created with `work_state new-task`)
-- [ ] No pre-existing incomplete plan was overwritten without explicit user confirmation
-- [ ] No task touches more than ~5 files
-- [ ] Checkpoints exist between major phases
-- [ ] The plan passed the approval gate: summary shown, `grill-me` frontier empty, explicit go-ahead, recorded with `work_state approve-phase [story-id] plan`
-
-## See Also
-
-Acceptance criteria are per-task and answer "did we build the right thing?". They sit on top of the project-wide Definition of Done, the standing bar every task clears before it counts as done. See `../../references/definition-of-done.md`.
+Acceptance criteria answer whether this task delivered the right result. The project-wide quality bar and Definition of Done still apply to every task; see `../../references/definition-of-done.md`.

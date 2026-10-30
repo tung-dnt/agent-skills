@@ -1,32 +1,11 @@
----
-pm-project: true
-id: "q7k2m9x4mgcu4h2w"
-title: "Shipment tracking"
-description: ""
-color: "#8b72be"
-icon: "📋"
-taskIds: ["[[t01-webhook-route|T01 webhook route]]", "[[t02-apply-event|T02 apply event]]", "[[t03-status-read|T03 status read]]"]
-parent: "[[shipments]]"
-customFields:
-  - id: "design_refs"
-    name: "Design refs"
-    type: "text"
-  - id: "branch"
-    name: "Branch"
-    type: "text"
-  - id: "design_approved"
-    name: "Design approved"
-    type: "text"
-teamMembers: []
-savedViews: []
-createdAt: "2026-09-01T09:00:00.000Z"
-updatedAt: "2026-09-01T09:00:00.000Z"
----
+# Shipment tracking fixture context
 
-# 📋 Shipment tracking
+Requirements and shared contracts are in [spec.md](spec.md). The [plan](plan.md) is a static index; current progress belongs only to the owning native session.
 
+| Task ID | Static brief |
+|---|---|
+| t01-webhook-route | [Webhook route](../../../artifacts/t01-webhook-route.md) |
+| t02-apply-event | [Apply event](../../../artifacts/t02-apply-event.md) |
+| t03-status-read | [Status read](../../../artifacts/t03-status-read.md) |
 
-## Tasks
-- [x] [[t01-webhook-route|T01 webhook route]]
-- [ ] [[t02-apply-event|T02 apply event]]
-- [ ] [[t03-status-read|T03 status read]]
+Read the relevant brief and cited contracts before designing a task. This fixture does not supply a task-status board, claims, or implementation approval.

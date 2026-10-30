@@ -13,7 +13,7 @@ Agent Skills is a collection of engineering workflow skills organized by develop
 
 When a task arrives, identify the development phase and apply the corresponding skill:
 
-Know the scope already? The entry commands are `/epic` (a product or a set of capabilities), `/story` (one feature: spec → design → plan), and `/task` (one change: claim → design note → test-first build → review). Each one checks the scope before writing anything (`../../references/work-artifacts.md`).
+Know the scope already? The entry commands are `/epic` (a product or capability map), `/story` (one feature: approved spec → design → static plan), `/task` (one focused change: every planned task gets an approved LLD before test-first build; ad-hoc mechanical changes may omit it), `/build` (main-owned ordering and native task workers), and `/resume` (current native session plus accessible artifacts) (`../../references/work-artifacts.md`).
 
 ```
 Task arrives

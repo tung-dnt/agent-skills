@@ -2,7 +2,8 @@
   "name": "agent-skills",
   "private": true,
   "scripts": {
-    "test:work-state": "node --test omp/work-state.test.ts",
+    "test:verification": "node --test omp/verification-policy.test.ts omp/verification-approval.test.ts omp/verification-snapshot.test.ts omp/verification-workspace.test.ts omp/verification-runner.test.ts omp/verification-receipts.test.ts omp/verification-bindings.test.ts omp/verification-gate.test.ts omp/verification-tool.test.ts omp/native-todo-gate.test.ts",
+    "test:native-artifacts": "node --test scripts/validate-native-artifacts.test.ts",
     "test:jev": "node --test hooks/jev.test.ts"
   },
   "omp": {
