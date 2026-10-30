@@ -27,7 +27,7 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 
 ---
 
-## Unreleased
+## 0.7.0 — 2026-10-30
 
 - **Breaking:** lifecycle workflows no longer use task-note status, project claims, or a task-store CLI. Existing board data is not migrated or deleted automatically; see the [adoption guide](docs/adoption-guide.md).
 - **Added:** opt-in Git-candidate verification through the native `verification` tool and `/verification`, with user-approved scope/checks, real child outcomes, resource-generation freshness, and protected native todo transitions.

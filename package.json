@@ -1,5 +1,6 @@
 {
   "name": "agent-skills",
+  "version": "0.7.0",
   "private": true,
   "scripts": {
     "test:verification": "node --test omp/verification-policy.test.ts omp/verification-approval.test.ts omp/verification-snapshot.test.ts omp/verification-workspace.test.ts omp/verification-runner.test.ts omp/verification-receipts.test.ts omp/verification-bindings.test.ts omp/verification-gate.test.ts omp/verification-tool.test.ts omp/native-todo-gate.test.ts",
