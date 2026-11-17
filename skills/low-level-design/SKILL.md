@@ -11,15 +11,14 @@ Before implementation, write down the decisions a worker would otherwise make si
 
 ## When to Use
 
-- Required before code for **every task in a written breakdown**, including mechanical, configuration, and documentation tasks; the note may be concise.
-- Also use for ad-hoc tasks when business rules, edge cases, failure behavior, concurrency, authorization, or observability need decisions.
+- Use for a task with real decisions: business rules, edge cases, failure behavior, concurrency, authorization, or observability. A mechanical change needs no note.
 - Use it when you notice yourself deciding behavior while coding.
 
-A truly ad-hoc mechanical change with no design decisions may omit LLD. A task selected from a written plan may not skip its LLD solely because it looks trivial. If the task changes a shared contract, creates an interface used by another task, or alters shared data, escalate to high-level design. If requirements/design do not exist, start with `spec-driven-development` and `high-level-design`.
+The note is the agent's own working design; nobody approves it. If the task changes a shared contract, creates an interface used by another task, or alters shared data, stop and raise it with the lead, who owns contracts.
 
 ## Process
 
-Pause after step 1 at the checkpoint in `../../references/approval-gate.md`; show the relevant contract IDs, source paths, and existing patterns. For a bug or multiple plausible approaches, ask the user to choose via a decision brief. Otherwise ask whether to continue. Then write steps 2–6 in one pass, pausing when an actual user decision is needed. The whole static design is gated before building. One-pass requests may skip the intermediate checkpoint only; never skip final approval.
+Write steps 1–6 in one pass. Ask the lead only when a decision is theirs: an invariant, a shared contract, or scope.
 
 ### 1. Load only what the task needs
 
@@ -51,9 +50,9 @@ Every invariant, failure branch, and cross-cutting rule maps to at least one tes
 
 ### 7. Check size and shared scope
 
-If the design exceeds roughly 15 lines or spans independent subsystems, propose a split as a user decision; do not silently rewrite the approved plan. If it touches an API, schema, status, event, or other contract another task uses, stop and request high-level design approval. Never patch a shared contract from inside a task.
+If the design exceeds roughly 15 lines or spans independent subsystems, split the task. If it touches an API, schema, status, event, or other contract another task uses, stop and raise it with the lead. Never patch a shared contract from inside a task.
 
-Write the note into the static design/worker artifact at the absolute path supplied by the main session. It is the code-review baseline, not a mutable task-status note. The main session obtains explicit user approval before implementation: per task, or through a user-approved repo-sized slice gate that shows every included task design. A plan gate alone does not approve task-level design. The main session owns approval evidence; a worker cannot approve itself.
+Write the note where the main session keeps its working design (for a lead story, the plan file's `## Tasks` or `## Decision log`). It is the code-review baseline, not a mutable task-status note, and it needs no approval.
 
 ## Note template
 
@@ -71,7 +70,7 @@ Write the note into the static design/worker artifact at the absolute path suppl
 
 ## At review
 
-Review the diff against the approved note: every invariant/failure branch is implemented, no unapproved behavior was added, and the note matches code. A divergence requires stopping and getting the static design changed through the user gate.
+Review the diff against the note: every invariant and failure branch is implemented, and the note matches the code. When they diverge, fix whichever is wrong and record the change in the decision log.
 
 ## Common Rationalizations
 
@@ -85,7 +84,7 @@ Review the diff against the approved note: every invariant/failure branch is imp
 
 ## Red Flags
 
-- Implementation starts before the user approves the task design.
+- The task changes a shared contract without the lead.
 - A rule has no decided violation outcome or corresponding test.
 - Authentication is treated as proof of resource ownership.
 - A worker changes a shared contract or silently chooses missing behavior.
@@ -100,4 +99,4 @@ Review the diff against the approved note: every invariant/failure branch is imp
 - [ ] Failure, concurrency, security, and observability were considered.
 - [ ] Every rule maps to a test case.
 - [ ] Shared contracts are cited/escalated, never changed unilaterally.
-- [ ] The user approved before implementation, and the final code matches the note.
+- [ ] The final code matches the note.

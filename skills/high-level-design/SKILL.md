@@ -26,7 +26,7 @@ Do not design against unclear requirements; use `spec-driven-development` first.
 
 ## Process
 
-Work top-down. Follow the checkpoints in `../../references/approval-gate.md`: pause after steps 1, 5, and 9 unless the user explicitly requested a one-pass design. A one-pass request never skips the final user approval. Show each result, ask any decision as soon as it arises, and wait before relying on it.
+Work top-down in one pass. In a lead-driven story the lead owns high-level design: use this method only when the lead asks you to draft one, and raise decisions as questions instead of settling them.
 
 ### 1. Load inputs and current architecture
 
@@ -97,9 +97,9 @@ Record a contract only when at least two tasks depend on it; a single-task detai
 
 For decisions expensive to reverse, compare at least two viable options against requirements/NFRs, effort, risk, and reversibility. Present the hinges and the condition that would change the recommendation as a decision brief. Record durable decisions with `documentation-and-adrs` where the repository's ADR convention applies.
 
-### 12. Adversarial review and user approval
+### 12. Adversarial review
 
-Run `doubt-driven-development` in a fresh context against the approved spec: find requirements with no design, NFRs without a mechanism, and unowned failure paths. Resolve findings, then pass the user gate in `../../references/approval-gate.md`. The user must explicitly approve before task planning. No native todo item, worker status, or artifact path is approval.
+Run `doubt-driven-development` in a fresh context against the approved spec: find requirements with no design, NFRs without a mechanism, and unowned failure paths. Resolve findings and hand the draft, with its open decisions, to the lead.
 
 ## Output
 
@@ -144,9 +144,9 @@ Trace each design element to one or more `FR`/`NFR` IDs; anything tracing to not
 
 ## Keep design aligned
 
-When implementation proves the design wrong, stop affected work and use the user gate to approve a revised design. Update the static artifact and affected worker briefs before resuming; main owns ordering and file reassignment. Do not use a task-status board to discover dependents. The repository's current system architecture should be updated using its existing convention when the system shape changes.
+When implementation proves the design wrong, stop affected work and raise the change with the lead. Update the static artifact and affected worker briefs before resuming; main owns ordering and file reassignment. Do not use a task-status board to discover dependents. The repository's current system architecture should be updated using its existing convention when the system shape changes.
 
-Before the final implementation change is merged, update the repository's current system-architecture document with the approved shape, ownership, flows, security boundaries, and rollout. Keep shared-contract detail in its authoritative design artifact and link it rather than duplicating it. After a contract changes, the main session identifies every affected task and obtains fresh approval before that task resumes; a previous task approval does not cover revised contract text.
+Before the final implementation change is merged, update the repository's current system-architecture document with the approved shape, ownership, flows, security boundaries, and rollout. Keep shared-contract detail in its authoritative design artifact and link it rather than duplicating it. After a contract changes, the main session identifies every affected task before it resumes.
 
 ## Common Rationalizations
 
@@ -155,7 +155,6 @@ Before the final implementation change is merged, update the repository's curren
 | “The architecture is obvious.” | Record it so separate tasks do not make incompatible choices. |
 | “The NFR target is enough.” | A target without a mechanism and verification is unmet. |
 | “An implementer can decide the failure path.” | Shared failure behavior must be settled before dependent tasks start. |
-| “The old task approval still applies.” | Changed shared contracts require review of affected tasks and fresh approval. |
 
 ## Red Flags
 
@@ -176,5 +175,5 @@ Before the final implementation change is merged, update the repository's curren
 - [ ] Alternatives and expensive-to-reverse decisions were examined.
 - [ ] Security, deployment, rollout, and failure ownership are explicit.
 - [ ] Fresh-context doubt review findings are resolved.
-- [ ] The user approved the design before planning.
+- [ ] The lead has the draft and its open decisions.
 - [ ] The static artifact and task briefs do not duplicate mutable progress.

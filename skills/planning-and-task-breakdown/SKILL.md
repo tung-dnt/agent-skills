@@ -76,8 +76,6 @@ Keep every likely changed/generated file in the owned-path list, including lockf
 
 Each task should have concrete acceptance criteria and a verification step. Preserve requirements and security constraints; do not reduce the project quality bar to fit a task.
 
-**Every planned task has a task-level design gate before code.** Invoke `low-level-design` for every task from a written breakdown, including mechanical tasks; a concise LLD is enough. The main session obtains explicit approval per task or through a user-approved repo-sized slice gate showing every included design. Do not skip solely because a task looks trivial. Only an ad-hoc mechanical change with no design decisions may omit LLD.
-
 ### 5. Size tasks
 
 | Size | Typical scope | Example |
@@ -96,9 +94,9 @@ The plan states an explicit order, dependencies, and an owner for every file sha
 
 Parallel workers are appropriate only when dependencies and exact file ownership show no overlap. There is no project-wide claim service or automatic shared-file conflict detector; if ownership is unclear, run sequentially. Main makes the coordination decision.
 
-### 7. User approval
+### 7. Decisions for the lead
 
-When ordering, scope, or architecture has meaningful alternatives, present a decision brief with evidence, trade-offs, what the choice hinges on, and the condition that would change the recommendation. Show the static plan and task briefs at the gate in `../../references/approval-gate.md`, ask the user, and wait for explicit approval before implementation. A generated native todo or imported artifact is not approval.
+When ordering, scope, or architecture has alternatives that change the story's approach, invariants or contracts, raise them as questions before the plan summary is approved (`../../references/approval-gate.md`). Task order and file ownership are yours.
 
 ## Output artifacts
 
@@ -134,7 +132,7 @@ Keep each task ID mapped to its brief path in this index, and show the absolute 
 When work reveals that scope, design, dependencies, or file ownership must change:
 1. Stop affected work and compare the observed issue with approved scope/design.
 2. Explain the change and any consequences; ask the user when approval boundaries or requirements change.
-3. Update the static plan/brief only after approval. Preserve prior context when needed; do not destroy a user's unfinished work or infer approval from historical notes.
+3. Update the static plan/brief; when the change alters the approved summary or repository list, get the plan approved again. Preserve prior context when needed; do not destroy a user's unfinished work or infer approval from historical notes.
 4. Reconcile the current native todo by readback, keeping it as the only mutable progress list. Do not create a migration board or mirror statuses.
 5. Reassign file ownership and order explicitly before workers resume.
 
@@ -147,7 +145,6 @@ Before implementation, confirm:
 - [ ] Every worker has a static brief at a real absolute path and an allowed-path boundary.
 - [ ] Work is sized for one focused session and vertical where practical.
 - [ ] User approval is explicit and not inferred from native task/todo state.
-- [ ] Every task from a written breakdown has a user-approved static LLD before code; concise notes and explicitly approved slice gates are allowed, silent skips are not.
 - [ ] Required full integration/runtime checks and their main owner are identified.
 - [ ] No second mutable task-status tracker has been introduced.
 
@@ -158,7 +155,6 @@ Before implementation, confirm:
 | “The worker will work out the requirements.” | The brief needs testable acceptance criteria and exact scope before handoff. |
 | “Native task handles dependencies and ownership.” | Main must explicitly order dependencies and prevent shared-file overlap. |
 | “Focused tests passed, so integration is optional.” | The required full gates still belong to the integration owner. |
-| “A small planned task needs no design.” | Every task in a written breakdown needs an approved LLD; it may be concise. |
 
 ## Red Flags
 
