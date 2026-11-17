@@ -7,7 +7,7 @@ Work at **task scope**: one focused change that does not alter a shared contract
 ## Before building
 
 1. Read the request, repository instructions, source, and any existing approved design/brief. Use a tracker only as input, never as the authority for code approval.
-2. Confirm task scope with `references/work-artifacts.md`. If work needs a shared contract or several independent slices, recommend `/story` or `/plan` and wait for confirmation before changing scope.
+2. Confirm task scope with `references/work-artifacts.md`. If work needs a shared contract or several independent slices, recommend `/story` and wait for confirmation before changing scope.
 3. Read the native todo view and preserve registered items. Do not claim or pick a task via a project board, Git ref, status note, or implicit global readiness. The main session chooses the task and names exact allowed paths.
 4. **Write an LLD for every planned task.** Invoke `agent-skills:low-level-design` for any task selected from a written breakdown, even when it appears mechanical; a concise note is fine. Only a genuinely ad-hoc mechanical change with no design decision may omit it. Use the approved brief and contracts, write the note to the static artifact, and retain its test list.
 

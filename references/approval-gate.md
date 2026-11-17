@@ -6,7 +6,6 @@ The user approves scope and design decisions before downstream work begins. The 
 
 | Workflow | Gate after | Blocks |
 |---|---|---|
-| `/epic` | Requirements, architecture, and story map | The next planning phase or story |
 | `/story` and `spec-driven-development` | Requirements, design, and plan | The next phase or implementation |
 | `high-level-design` | Shared system shape and contracts | Task planning |
 | `planning-and-task-breakdown` | Ordered task briefs and file ownership | Worker execution |

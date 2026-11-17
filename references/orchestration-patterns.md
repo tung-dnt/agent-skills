@@ -82,7 +82,7 @@ If any answer is "no," fall back to direct invocation or a single-persona comman
 The user runs slash commands in a defined order, carrying context (or commit history) between them. There is no orchestrator agent — the user IS the orchestrator.
 
 ```
-user runs:  /spec  →  /plan  →  /build  →  /test  →  /review  →  /ship
+user runs:  /story  →  /build  →  /test  →  /review  →  /ship
 ```
 
 **Use when:** the workflow has dependencies (each step needs the previous step's output) and human judgment between steps adds value.
@@ -317,7 +317,7 @@ A `code-reviewer` that internally invokes `security-auditor` when it sees auth c
 
 ### C. Sequential orchestrator that paraphrases
 
-An agent that calls `/spec`, then `/plan`, then `/build`, etc. on the user's behalf.
+An agent that calls `/story`, then `/build`, then `/ship`, etc. on the user's behalf.
 
 **Why it fails:**
 - Loses the human checkpoints that catch wrong-direction work

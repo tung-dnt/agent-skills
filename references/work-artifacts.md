@@ -16,7 +16,6 @@ Do not configure a vault/store, create an `_tasks` board, create a replacement p
 
 | Scope | Entry point | Main output | Next |
 |---|---|---|---|
-| Epic or project | `/epic` | Requirements, architecture/ADRs when needed, ordered story map | `/story` |
 | Story or capability | `/story` | Approved requirements, high-level design/contracts when needed, static ordered plan and worker briefs | `/build` or `/task` |
 | One focused task | `/task` | Approved task design/brief and implementation | Review/integration |
 | Approved implementation | `/build` | Native task-worker output and main-owned integration | `/review` / `/ship` |

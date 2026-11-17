@@ -13,7 +13,7 @@ Agent Skills is a collection of engineering workflow skills organized by develop
 
 When a task arrives, identify the development phase and apply the corresponding skill:
 
-Know the scope already? The entry commands are `/epic` (a product or capability map), `/story` (one feature: approved spec → design → static plan), `/task` (one focused change: every planned task gets an approved LLD before test-first build; ad-hoc mechanical changes may omit it), `/build` (main-owned ordering and native task workers), and `/resume` (current native session plus accessible artifacts) (`../../references/work-artifacts.md`).
+Know the scope already? The entry commands are `/story <id>` (one story: the lead's brief → one question batch → one approved plan), `/task` (one focused change in pairing mode, test-first), `/build <id>` (main-owned ordering and native task workers inside the harness fences), and `/resume` (current native session plus accessible artifacts) (`../../references/work-artifacts.md`).
 
 ```
 Task arrives
@@ -145,7 +145,7 @@ These are the subtle errors that look like productivity but create problems:
 
 4. **When in doubt, start with a spec.** If the task is non-trivial and there's no spec, begin with `spec-driven-development`.
 
-5. **Confirm before work starts.** Every spec, design, plan, and task passes the approval gate (`../../references/approval-gate.md`) before anything is built: a catch-up summary, `grill-me` rounds over the open decisions, and the user's explicit go-ahead. No gate passes silently. Before the gate, investigations and every design step stop at a step checkpoint, so the user confirms the work as it's produced, not only the final result.
+5. **One approval, then fences.** A story's plan is approved once through `/story` (`../../references/approval-gate.md`). After that the agent owns low-level design; the harness stops work only at hard gates on risky paths.
 
 ## Lifecycle Sequence
 

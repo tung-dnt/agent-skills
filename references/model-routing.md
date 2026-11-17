@@ -28,9 +28,8 @@ In Claude Code the tier is the `model:` field in an agent's frontmatter, or the 
 
 | Scope | Stays in the main thread | Delegated |
 |---|---|---|
-| Epic | Interview (subagents can't ask the user), product requirements, story map | Architecture and codebase discovery (fast) · parallel option generation for `idea-refine` (balanced) · critique of the requirements (deep, fresh context) |
-| Story | Requirements, the `## Design` itself, approval gates, static plan and owner assignment | Reading existing architecture (fast) · `doubt-driven-development` critique (deep, fresh context) |
-| Task | Select/order one task, assign paths, approve a low-level design for every written-plan task (including mechanical), and own user gates | `task-builder` for one bounded, approved static brief (balanced) · `code-reviewer` per diff (balanced) · `security-auditor` when auth/sensitive data apply (deep) |
+| Story | Reading the lead's brief and system map, the one question batch, the plan and its single approval | Reading code in the plan's repositories (fast) · `doubt-driven-development` critique of the plan (deep, fresh context) |
+| Task | Select/order one task, assign paths, own low-level design, and handle hard-gate stops with the lead | `task-builder` for one bounded, approved static brief (balanced) · `code-reviewer` per diff (balanced) · `security-auditor` when auth/sensitive data apply (deep) |
 | Resume | Presenting observations and asking which safe action to take | `state-investigator` (fast, read-only), limited to accessible native session state, worker output, artifacts, and repository |
 
 ## Output Contract
