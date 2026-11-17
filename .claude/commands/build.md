@@ -1,30 +1,29 @@
 ---
-description: Build approved work using native task workers, main-owned ordering, explicit file ownership, focused checks, and one full integration boundary
+description: Build an approved story plan with native task workers inside the harness fences — no per-task design approval; hard gates and the plan's repository list are enforced in code
 ---
 
-Invoke `agent-skills:incremental-implementation` with `agent-skills:test-driven-development`.
-
-`/build [work-id]` builds the approved work named by the user or static plan. The main session owns the native todo, execution order, task selection, and explicit file ownership. Static specs/designs/plans/task briefs are the handoff; they never store mutable task status. Native task execution manages worker execution and output, not project-wide claims or verification.
+`/build [id]` builds the story whose plan the lead approved in `/story`. The harness refuses `/build` when the story has no approved plan. The main session owns the native todo, order, and file ownership. The plan file's `## Tasks` is your working breakdown, not an approval artifact.
 
 ## Before starting
 
-1. Read the approved spec, design, plan, worker briefs, repository instructions, and current source. If no clear approved scope/design is available, stop at the appropriate user gate; don't invent requirements.
-2. Read the native todo view. Preserve existing and registered unfinished items; never reset/reinitialize the list or guess after rewind/manual edits. If state is uncertain, request a fresh native todo readback and reconcile with the user.
-3. Main reviews the proposed order, dependencies, and file paths. Assign one writer per shared file. Parallelize only tasks whose explicit allowed paths and dependencies are independent; there is no cross-session lock, global DAG readiness, or automatic collision guarantee. Prefer sequential execution when ownership is unclear.
-4. Before starting **each task from a written plan**, ensure its low-level design is written into the static brief and explicitly user-approved, including mechanical tasks. A concise note is sufficient. Obtain approval per task or through an explicitly user-approved repo-sized slice gate that shows every included design; the plan gate alone is not task-design approval. Do not skip because work looks trivial. Only an ad-hoc mechanical change with no design decisions may omit LLD.
+1. Read the `# Lead story` block (brief, system map, hard gates) and the plan file. Read the native todo view and preserve registered unfinished items.
+2. Order the tasks and assign one writer per shared file. Run tasks in parallel only when their paths and dependencies are independent. The harness caps concurrent builders (`limits.builders` in `hard-gates.md`).
+3. You own low-level design. Do not ask the lead to approve task designs. Record each non-trivial choice and the alternative you rejected under `## Decision log` in the plan file as you go; it becomes the PR's decision log.
 
 ## Execute
 
-For each approved task:
-- For each task from a written plan, confirm its approved low-level design is present in the static brief and covers the assigned paths; this applies even to mechanical tasks. Only an ad-hoc mechanical change with no design decisions may omit LLD. Stop and return to the user gate if implementation would depart from the approved design.
-- Give a native task worker one static artifact brief by absolute path, the accepted change boundary, exact allowed paths, relevant design contracts, acceptance criteria, and focused checks. Workers must not update a second board or claim more work.
-- Require test-first implementation for behavior changes, focused checks, exact evidence, and an honest report. A worker's `completed` state is an execution outcome only, not proof that tests passed or code is reviewed.
-- The main session inspects the actual diff and reported output, handles decisions through the user gate, and keeps shared files/main ownership in the coordinator.
+For each task:
+- Give a native task worker the repository root, the plan file path, its owned paths, acceptance criteria and focused check. Workers receive the brief and system map from the harness.
+- Every brief invariant gets at least one proving test before its task is done. Go: run with `-race`, plus duplicate-request and concurrent-execution tests. TypeScript/Node: duplicate-delivery and concurrent-call tests against a real database or queue in a container, not mocks. Do not change or delete tests the lead owns; the harness gates them.
+- When a task touches shared state, retries, queues, transactions, caches or external side effects, write the concurrency note (`Idempotency:`, `Ordering:`, `Failure:`, `Transactions:`) under `## Concurrency note` in the plan file.
+- **Hard gates.** A write to a gated path stops for the lead. In the main session the harness asks the lead directly. A worker is blocked and reports `blocked: hard gate <id> <repo>/<path>`; then call the `lead` tool with `op: "gate"` and re-run the worker if the lead approves. Never route around a gate with a shell write.
+- **Fence.** Reads and writes outside the plan's `repos:` are blocked. If the work needs another repository, stop and report the gap; adding a repository to `repos:` needs the lead's approval again.
+- If the work would change the approved summary (goal, approach, or an invariant), stop, update the plan, and call the `lead` tool with `op: "approve"` again.
 
-For registered verification work, use the documented verification interface operations `begin`, `run`, `status`, `complete`, and `cancel`. `begin` is not a model approval flag; binding requires user-facing approval. `run` is actual execution, `status` reports observed state, `complete` records valid evidence, and `cancel` stops work without a passing receipt. Never call `complete` based on a worker's assertion alone. The native todo progress remains separate from verification receipts. Unregistered work is not described as hard-verified.
+For registered verification work, use the `verification` operations `begin`, `run`, `status`, `complete` and `cancel` as documented; `complete` records evidence and does not change the native todo.
 
 ## Integration boundary
 
-Workers run only focused checks during iteration. At a stable integration boundary, the main session runs the repository's required full suite, integration checks, and required runtime/browser checks once, then records exact results and the candidate identity in the supported evidence mechanism. Do not reduce or waive quality criteria. If any required check fails, keep the native item open, report the real failure, and fix or ask the user; don't suppress it or relabel task completion as proof.
+Workers run focused checks. At a stable boundary the main session runs the repository's required full suite and runtime checks once and records exact results. If a required check fails, keep the native item open and report the real failure.
 
-After full checks and review, the main session decides whether to complete the native todo item. If evidence-gated work is registered, the verification gate controls protected native completion; `complete` records evidence and does not itself change todo state. Cancellation is not verified completion. Report completed work, focused and integration evidence separately, anything unregistered/unverified, remaining work, and the next command.
+In async mode (`mode: async` in the brief) keep going without check-ins: the harness notifies the lead only at a hard-gate stop or when you stop. Report completed work, focused and integration evidence separately, what is unverified, and the next command: `/ship`.
