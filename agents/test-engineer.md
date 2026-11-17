@@ -57,6 +57,13 @@ For every function or component:
 | Error paths | Invalid input, network failure, timeout |
 | Concurrency | Rapid repeated calls, out-of-order responses |
 
+### 6. Prove the lead's invariants
+When a brief lists invariants (`I1`, …), each needs at least one test that fails without its mechanism:
+- Go: run with `-race`; add duplicate-request and concurrent-execution tests.
+- TypeScript/Node: duplicate-delivery and concurrent-call tests against a real database or queue in a container, not mocks.
+- Report each invariant as `In: path::test name`, or `In: no proving test` as a Critical gap.
+
+Do not alter or delete tests or e2e scenarios the lead owns; propose changes in your report.
 
 ## Commands
 

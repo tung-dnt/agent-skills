@@ -45,6 +45,11 @@ Evaluate every change across these five dimensions:
 - Any unnecessary re-renders (in UI components)?
 - Any missing pagination on list endpoints?
 
+### 6. Lead-driven checks (when a brief, plan or PR body is supplied)
+- Does any decision-log entry conflict with a brief invariant? Flag it as Critical.
+- Does the concurrency note match the code: the idempotency key is enforced where it says, locks and transaction boundaries are where it says, and retry and duplicate behavior are as described?
+- For changes touching data, state or other services: does each DDIA item marked `yes` have a real mechanism in the diff (a constraint, lock or outbox, not app memory) and a proving test?
+- Does every brief invariant have a test that would fail without its mechanism?
 
 ## Commands
 

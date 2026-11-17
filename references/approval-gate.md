@@ -2,30 +2,26 @@
 
 The user approves scope and design decisions before downstream work begins. The main session owns the conversation and approval; a worker, native task status, todo checkbox, artifact fingerprint, or model-provided flag cannot approve anything.
 
-## When a gate runs
+## What the lead approves
 
-| Workflow | Gate after | Blocks |
+| Where | What | How |
 |---|---|---|
-| `/story` and `spec-driven-development` | Requirements, design, and plan | The next phase or implementation |
-| `high-level-design` | Shared system shape and contracts | Task planning |
-| `planning-and-task-breakdown` | Ordered task briefs and file ownership | Worker execution |
-| `/task` | Task scope/design before code; every task from a written plan requires an LLD gate, including mechanical tasks. Ad-hoc mechanical work with no design decision may omit LLD. | That task's implementation |
-| `/build` (written plan) | Each task's LLD, or one explicitly user-approved repo-sized slice showing every included design | Only task(s) named in that approval |
-Approval of a written plan approves the plan only; it does not approve any task-level design. Every planned task, including mechanical tasks, needs its own approved LLD before code. A repo-sized slice gate is valid only when the user explicitly approves the named slice after every included design is shown. Only genuinely ad-hoc mechanical work with no design decisions may omit LLD.
+| `/story` | The plan: `repos:` and the `## Summary` of at most 15 lines | The `lead` tool with `op: "approve"`: a dialog only the user can answer, recorded by the harness |
+| Any write, commit, push or PR touching a path in `hard-gates.md` | That path, for the story | A harness dialog in the main session, or the `lead` tool with `op: "gate"` after a worker is blocked |
+| `/ship` | Go or no-go | The ship decision |
 
-## The gate
+There is no spec gate, design gate, or per-task design gate. The agent owns low-level design and records its choices in the decision log. A changed `repos:` or `## Summary` needs the plan approved again.
 
-1. **Catch up.** Show a concise summary: business context, proposed-fit, root cause for bugs, recommendation, trade-offs, and open decisions. Omit inapplicable headings. Give the user the absolute path to the static artifact and show the relevant artifact content, including the task design itself.
-2. **Grill decisions.** Invoke `grill-me` for unresolved nontrivial choices. Present real alternatives, evidence, what the choice hinges on, a recommendation, and the condition that would change it. Do not re-ask settled checkpoint decisions.
-3. **Ask.** In omp use the available user-facing ask/approval interaction; on other hosts use their actual question mechanism. Ask the user to proceed or revise. A dismissed/hedged response is not approval. Never ask the model to supply an approval boolean, invoke an `approved=true` argument, or treat a todo/task status as consent. A slice gate must show every included LLD and name exactly which tasks the user's approval covers.
-4. **Wait.** If the user asks for revisions, change the artifact and summary, show the revised result, and ask again. Nothing downstream starts before an explicit go-ahead.
-5. **Record only through supported evidence binding.** For work registered with verification, use the supported user-facing approval callback to bind the exact owner/session, repository, approved scope/design, and policy/profile. This is minimal evidence/binding metadata, not a second progress list. Never recreate approvals in mutable Markdown or infer a new approval from historical fingerprints. If no supported UI path exists, do not claim a protected binding was approved.
+## The plan approval
+
+1. Ask every open question in one `ask` form before writing the plan (`/story`).
+2. Write the plan file; keep `## Summary` to 15 lines.
+3. Call the `lead` tool with `op: "approve"`. A dismissed dialog is not approval. Never pass an approval flag to a tool, and never treat a todo or task status as consent.
+4. If the lead declines, revise and call it again. Nothing in a repository changes before approval; the harness blocks it.
 
 ## Checkpoints before a gate
 
-For an investigation or staged design, show the facts and decisions produced at each required checkpoint and wait before continuing. Keep the user involved in the process, not just the final summary. A one-pass request may skip intermediate checkpoints only where the relevant skill permits; it never skips the final explicit user gate or changes design-quality criteria.
-
-A subagent may investigate or draft static content, but only the main session may present the gate and receive the user's answer. A worker's own task completion cannot satisfy an approval gate.
+There are no intermediate checkpoints. For an investigation, report the findings when they are complete. A subagent may investigate or draft, but only the main session calls the `lead` tool.
 
 ## Verification is separate
 
