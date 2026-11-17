@@ -14,3 +14,8 @@ Review the current changes (staged or recent commits) across all five axes:
 
 Categorize findings as Critical, Required, Optional, or Nit.
 Output a structured review with specific file:line references and fix recommendations.
+
+When a `# Lead story` block or a PR body with a decision log is available, also:
+- flag any decision-log entry that conflicts with a brief invariant (Critical);
+- check the concurrency note against the code;
+- for changes touching data, state or other services, check that each DDIA item marked `yes` has the stated mechanism and its proving test.
