@@ -181,7 +181,7 @@ The lead writes the brief at `lead/stories/<id>/brief.md` in the knowledge base 
 - `/build <id>`: main-owned order/file ownership → native task workers as useful, inside the hard gates and the plan's repository list.
 - `/task`: one focused change in pairing mode → test-first implementation and review.
 
-`/story` needs the omp-starter lead harness (`/starter lead` creates the brief template, system map and hard-gates file). The only planning approval is the plan, through the `lead` tool ([references/approval-gate.md](../references/approval-gate.md)); there is no spec, design, or per-task design approval. The agent owns low-level design and records each non-trivial choice in the decision log. A native todo, native task completion, imported note, or model argument is not approval. The user-facing approval interaction cannot be replaced by `approved=true`.
+`/story` needs the omp-starter lead harness (`/starter lead` creates the brief template and hard-gates file; the system map is the `services:` block of each repository's project note, `projects/<repo>.md` in the knowledge base). The only planning approval is the plan, through the `lead` tool ([references/approval-gate.md](../references/approval-gate.md)); there is no spec, design, or per-task design approval. The agent owns low-level design and records each non-trivial choice in the decision log. A native todo, native task completion, imported note, or model argument is not approval. The user-facing approval interaction cannot be replaced by `approved=true`.
 
 ### Working across sessions
 

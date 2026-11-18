@@ -27,7 +27,7 @@ The lead is out of the loop while you build. Do not stop to ask about a changed 
 
 - **Plan.** The plan file states the current plan and nothing else. When the approach changes, replace the affected lines of `## Summary`, `## Tasks` and `## Decision log`. Do not append a history or a change log: old text misleads the next reader. This needs no approval.
 - **Decision log.** One line per non-trivial choice: `- <choice> — rejected: <alternative> (<why>)`. When a decision changes, replace its line. It becomes the PR's decision log.
-- **System map.** When the structure changes (a new call between services, a new table owner, a new queue or topic), edit that service's entry in `system-map.md` in the same change and list it under `## System-map diff` for the PR.
+- **System map.** When the structure changes (a new call between services, a new table owner, a new queue or topic), edit that service's entry in the `services:` block of the repository's project note (its path is in the `# Lead story` block) in the same change, set the note's `updated:` date, and list the change under `## System-map diff` for the PR.
 - **Brief.** Invariants and boundaries are the lead's. If the work cannot meet one, stop and report; do not edit the brief.
 - **Wording.** Short and direct: what, then why. No preamble, no narrative, no restating the brief.
 

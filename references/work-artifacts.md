@@ -10,7 +10,7 @@ This reference defines the handoff between planning, a main session, and native 
 - The main session explicitly chooses order and names one owner per shared file. Dependency ordering and ownership are coordinator decisions, not automatic DAG readiness or cross-session locking.
 - Native todo/task completion is an execution/progress outcome, never proof that checks passed or that work was reviewed.
 
-Lead artifacts (brief, system map, hard gates, plan, story status) live in the knowledge base and are managed by the omp-starter lead harness: in the `lead/` folder by default, or in the folders the knowledge base sets. Use the exact paths the story block in your prompt names; do not assume `lead/`. The agent writes the plan file and keeps the system map current. Do not create an `_tasks` board or a replacement project JSON store, mirror task status into Markdown, or use Git refs as claims. No approval is inferred from an imported plan or a prior session's assertion.
+Lead artifacts (brief, hard gates, plan, story status) live in the knowledge base and are managed by the omp-starter lead harness: in the `lead/` folder by default, or in the folders the knowledge base sets. Use the exact paths the story block in your prompt names; do not assume `lead/`. The system map is the `services:` block of each repository's project note (`projects/<repo>.md` in the knowledge base): a plan is approved only when every repository in it has one. The agent writes the plan file and keeps those blocks current. Do not create an `_tasks` board or a replacement project JSON store, mirror task status into Markdown, or use Git refs as claims. No approval is inferred from an imported plan or a prior session's assertion.
 
 ## Scope and command map
 

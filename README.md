@@ -28,6 +28,10 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 
 ---
 
+## 0.8.2 — 2026-11-18
+
+- **Changed:** the system map is the `services:` block of each repository's project note (`projects/<repo>.md`), not one `system-map.md`. `/story`, `/build`, `/task` and `/ship` point agents there; a plan needs such a note for every repository before approval. Needs omp-starter 0.36.0.
+
 ## 0.8.1 — 2026-11-18
 
 - **Changed:** the docs no longer say the lead's files are always in `lead/`. omp-starter 0.35.0 lets a knowledge base keep them in its own folders, and agents are told to use the paths the story block names.
@@ -74,7 +78,7 @@ Skills also activate automatically based on what you're doing — designing an A
 
 ### A workflow for each scope of work
 
-You are the lead: you write a brief at `lead/stories/<id>/brief.md` in your knowledge base, or in the stories folder your knowledge base sets (the omp-starter `/starter lead` command creates the template, a system map and the hard-gates file). `/story`, `/task`, `/build`, and `/resume` then run with one plan approval, native progress, and static artifact handoffs:
+You are the lead: you write a brief at `lead/stories/<id>/brief.md` in your knowledge base, or in the stories folder your knowledge base sets (the omp-starter `/starter lead` command creates the template and the hard-gates file; each repository's services live in its project note). `/story`, `/task`, `/build`, and `/resume` then run with one plan approval, native progress, and static artifact handoffs:
 
 ```mermaid
 flowchart TD
