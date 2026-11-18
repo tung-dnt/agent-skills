@@ -28,6 +28,12 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 
 ---
 
+## 0.8.0 — 2026-11-18
+
+- **Breaking:** `/spec`, `/plan` and `/epic` are removed. A story starts from a brief you write: `/story <id>` reads it, asks every question in one batch, and gets one plan approval; `/build <id>` builds the approved plan. On omp these need omp-starter 0.34.0 and its `/starter lead` setup.
+- **Changed:** there is no spec, design or per-task design approval. The agent owns low-level design, keeps the plan and the system map current as the work changes, and records its choices in the PR's decision log. The four design and planning skills keep their method and lose their approval steps.
+- **Added:** `/ship` builds the PR body the harness checks (decision log, invariant checklist with proving tests, risk summary); `/review`, `code-reviewer` and `test-engineer` check decisions and tests against the brief's invariants.
+
 ## 0.7.0 — 2026-10-30
 
 - **Breaking:** lifecycle workflows no longer use task-note status, project claims, or a task-store CLI. Existing board data is not migrated or deleted automatically; see the [adoption guide](docs/adoption-guide.md).
