@@ -28,6 +28,10 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 
 ---
 
+## 0.8.1 — 2026-11-18
+
+- **Changed:** the docs no longer say the lead's files are always in `lead/`. omp-starter 0.35.0 lets a knowledge base keep them in its own folders, and agents are told to use the paths the story block names.
+
 ## 0.8.0 — 2026-11-18
 
 - **Breaking:** `/spec`, `/plan` and `/epic` are removed. A story starts from a brief you write: `/story <id>` reads it, asks every question in one batch, and gets one plan approval; `/build <id>` builds the approved plan. On omp these need omp-starter 0.34.0 and its `/starter lead` setup.
@@ -70,7 +74,7 @@ Skills also activate automatically based on what you're doing — designing an A
 
 ### A workflow for each scope of work
 
-You are the lead: you write a brief at `lead/stories/<id>/brief.md` in your knowledge base (the omp-starter `/starter lead` command creates the template, a system map and the hard-gates file). `/story`, `/task`, `/build`, and `/resume` then run with one plan approval, native progress, and static artifact handoffs:
+You are the lead: you write a brief at `lead/stories/<id>/brief.md` in your knowledge base, or in the stories folder your knowledge base sets (the omp-starter `/starter lead` command creates the template, a system map and the hard-gates file). `/story`, `/task`, `/build`, and `/resume` then run with one plan approval, native progress, and static artifact handoffs:
 
 ```mermaid
 flowchart TD
@@ -90,7 +94,7 @@ flowchart TD
 | Execution | Native todo for this main session; native task for worker execution | Hard gates on risky paths and the repo fence are enforced by the harness; worker output is not test proof |
 | Verification | Candidate-scoped receipts for registered work | `begin`, `run`, `status`, `complete`, `cancel`; approval remains user-facing |
 | Integration | Main-owned required full, integration, and runtime/browser checks | Report only observed results |
-| PR | Decision log, invariant checklist, risk summary | The harness checks the PR body against `lead/pr-format.md` |
+| PR | Decision log, invariant checklist, risk summary | The harness checks the PR body against `pr-format.md`, next to the hard-gates file |
 
 **One plan approval.** [references/approval-gate.md](references/approval-gate.md): the agent asks every question in one batch, writes the plan, and calls the `lead` tool, which shows it to you in a dialog only you can answer. There is no spec gate, design gate, or per-task design approval. Do not treat a todo item, task completion, imported note, or model argument as approval.
 

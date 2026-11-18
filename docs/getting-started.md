@@ -169,7 +169,7 @@ This portability gap is tracked in
 
 ## Briefs, plans, and task artifacts
 
-The lead writes the brief at `lead/stories/<id>/brief.md` in the knowledge base; `/story` produces the plan file with the repositories, a short summary, ordered tasks, and a decision log. These artifacts carry acceptance criteria, invariants, decisions, dependencies, exact file ownership, and verification expectations. They do not store mutable task status. The main session uses native todo as its only progress list and native task for worker execution; it does not require a `_tasks` directory, work-state tool, or replacement project JSON store. See [Work Artifacts and Native Progress](../references/work-artifacts.md) and the [Native Task Workflow](native-task-workflow.md).
+The lead writes the brief at `lead/stories/<id>/brief.md` in the knowledge base (the default; omp-starter can keep stories in another folder of the knowledge base); `/story` produces the plan file with the repositories, a short summary, ordered tasks, and a decision log. These artifacts carry acceptance criteria, invariants, decisions, dependencies, exact file ownership, and verification expectations. They do not store mutable task status. The main session uses native todo as its only progress list and native task for worker execution; it does not require a `_tasks` directory, work-state tool, or replacement project JSON store. See [Work Artifacts and Native Progress](../references/work-artifacts.md) and the [Native Task Workflow](native-task-workflow.md).
 
 - Keep static artifacts where they can be reviewed and handed to a worker by absolute path.
 - The agent keeps the plan file current as the approach changes; the lead's brief changes only through the lead.
