@@ -13,9 +13,9 @@ The harness blocks PR creation unless the body follows `lead/pr-format.md` in th
 - `## Decision log` from the plan file's decision log;
 - `## Invariant checklist`: each brief invariant with `test: path::test name`;
 - `## Risk summary`: the top risks, ranked, each with a `file:line` pointer;
-- `## Concurrency note`, `## DDIA checklist`, `## System-map diff` and `## Structural changes` when the format file says they apply.
+- `## Concurrency note`, `## DDIA checklist`, `## System-map diff` (what you changed in `system-map.md`, one line per service) and `## Structural changes` when the format file says they apply.
 
-Open the PR with `gh pr create --body-file <file>`. The lead reads the structural changes and the risk summary first and opens code only where they point, so write them to be accurate, not reassuring.
+Open the PR with `gh pr create --body-file <file>`. The lead reads the structural changes and the risk summary first and opens code only where they point, so write them to be accurate, not reassuring, and keep every line short and direct.
 
 ## Phase A — Parallel fan-out
 

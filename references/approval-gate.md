@@ -6,11 +6,11 @@ The user approves scope and design decisions before downstream work begins. The 
 
 | Where | What | How |
 |---|---|---|
-| `/story` | The plan: `repos:` and the `## Summary` of at most 15 lines | The `lead` tool with `op: "approve"`: a dialog only the user can answer, recorded by the harness |
-| Any write, commit, push or PR touching a path in `hard-gates.md` | That path, for the story | A harness dialog in the main session, or the `lead` tool with `op: "gate"` after a worker is blocked |
+| `/story` | The plan's `repos:`, against the brief's invariants and boundaries; the dialog shows the plan's `## Summary` | The `lead` tool with `op: "approve"`: a dialog only the user can answer, recorded by the harness |
+| Any write, commit, push or PR touching a path in `hard-gates.md` | That path, for the story | `mode: sync`: a harness dialog in the main session. `mode: async`, or after a worker is blocked: the gate is queued and the lead decides it through the `lead` tool with `op: "gate"` |
 | `/ship` | Go or no-go | The ship decision |
 
-There is no spec gate, design gate, or per-task design gate. The agent owns low-level design and records its choices in the decision log. A changed `repos:` or `## Summary` needs the plan approved again.
+There is no spec gate, design gate, or per-task design gate. The agent owns low-level design and records its choices in the decision log. After approval the lead is out of the loop: the agent replaces the plan's summary and tasks as the approach changes, without asking, and the plan file states the current plan only. A new repository in `repos:`, or the lead's edit to the brief's invariants or boundaries, needs the plan approved again.
 
 ## The plan approval
 

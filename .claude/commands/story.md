@@ -14,6 +14,7 @@ If your context has no `# Lead story` block, stop and tell the user to run `/sta
    - frontmatter `repos:` with the absolute root of every repository you will read or change;
    - `## Summary`: at most 15 lines restating the goal, the approach, and each invariant id (`I1`, …) with how it will be proven;
    - `## Tasks`: your ordered task list with owned paths and the focused check for each. This section is yours; the lead does not approve it.
-   Do not add a contract or cross-repository boundary the brief does not name; raise it as a question instead.
-4. **Get the one approval.** Call the `lead` tool with `op: "approve"`. It shows the summary to the lead. This is the only planning approval: no spec, design, or per-task design approval follows. If the lead declines, revise and call it again. The harness blocks repository edits until the plan is approved, and again whenever `repos:` or `## Summary` changes.
+   - `## Decision log`: one line per non-trivial choice, `- <choice> — rejected: <alternative> (<why>)`.
+   Write every line short and direct. Do not add a contract or cross-repository boundary the brief does not name; raise it as a question instead.
+4. **Get the one approval.** Call the `lead` tool with `op: "approve"`. It shows the summary and the repositories to the lead. This is the only planning approval: no spec, design, or per-task design approval follows. If the lead declines, revise and call it again. The harness blocks repository edits until the plan is approved, and again when `repos:` changes or the lead edits the brief's invariants or boundaries. After approval the summary and tasks are yours to replace as the approach changes.
 5. **Hand off.** Put the tasks in the native todo and name the next command: `/build <id>`. Recommend a fresh session for a large story.

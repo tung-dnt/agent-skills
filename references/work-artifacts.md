@@ -10,13 +10,13 @@ This reference defines the handoff between planning, a main session, and native 
 - The main session explicitly chooses order and names one owner per shared file. Dependency ordering and ownership are coordinator decisions, not automatic DAG readiness or cross-session locking.
 - Native todo/task completion is an execution/progress outcome, never proof that checks passed or that work was reviewed.
 
-Lead artifacts (brief, system map, hard gates, plan, story status) live in the knowledge base's `lead/` folder and are managed by the omp-starter lead harness; the agent writes only the plan file. Do not create an `_tasks` board or a replacement project JSON store, mirror task status into Markdown, or use Git refs as claims. No approval is inferred from an imported plan or a prior session's assertion.
+Lead artifacts (brief, system map, hard gates, plan, story status) live in the knowledge base's `lead/` folder and are managed by the omp-starter lead harness; the agent writes the plan file and keeps the system map current. Do not create an `_tasks` board or a replacement project JSON store, mirror task status into Markdown, or use Git refs as claims. No approval is inferred from an imported plan or a prior session's assertion.
 
 ## Scope and command map
 
 | Scope | Entry point | Main output | Next |
 |---|---|---|---|
-| Story or capability | `/story <id>` | One approved plan (repos and summary) from the lead's brief | `/build <id>` |
+| Story or capability | `/story <id>` | One approved plan from the lead's brief | `/build <id>` |
 | One focused task | `/task` | The change, built test-first in pairing mode | Review/integration |
 | Approved story | `/build <id>` | Native task-worker output and main-owned integration | `/review` / `/ship` |
 
@@ -51,7 +51,7 @@ The brief and design are static approval/context artifacts. Do not add checkboxe
 
 ## Approval and verification
 
-The lead approves one thing per story: the plan's `repos:` and `## Summary`, through the `lead` tool (`approval-gate.md`). Task-level design belongs to the agent and is not approved; hard gates on risky paths are enforced by the harness. Only the main session asks for approval. A model-facing flag, tool argument, native todo entry, worker completion, or imported fingerprint is not approval.
+The lead approves one thing per story: the plan's `repos:`, against the brief's invariants and boundaries, through the `lead` tool (`approval-gate.md`). The plan's summary and tasks and all task-level design belong to the agent, who replaces them as the work changes; hard gates on risky paths are enforced by the harness. Only the main session asks for approval. A model-facing flag, tool argument, native todo entry, worker completion, or imported fingerprint is not approval.
 
 The public `verification` tool and `/verification` command support only `begin`, `run`, `status`, `complete`, and `cancel`; `workId` is required for every operation. User-facing policy/scope approval precedes binding, never a model flag. `begin` binds the exact native todo item plus a static design/scope artifact and policy; `run` requires an approved named check; `complete` validates and records evidence without setting task progress; `cancel` never produces a passing receipt. Runtime checks additionally require a configured resource-provided reset/restart generation token probed before and after, with matching SHA-256 hashes. Missing/failed/malformed/changed probes refuse evidence; PID/runId is not generation, and no host/provider fallback is used. See [Native Task Workflow](../docs/native-task-workflow.md) for the public argument, slash-flag, and runtime evidence contracts.
 

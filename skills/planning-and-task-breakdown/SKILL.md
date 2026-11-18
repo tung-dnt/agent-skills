@@ -96,7 +96,7 @@ Parallel workers are appropriate only when dependencies and exact file ownership
 
 ### 7. Decisions for the lead
 
-When ordering, scope, or architecture has alternatives that change the story's approach, invariants or contracts, raise them as questions before the plan summary is approved (`../../references/approval-gate.md`). Task order and file ownership are yours.
+When ordering, scope, or architecture has alternatives that change the story's approach, invariants or contracts, raise them as questions before the plan is approved (`../../references/approval-gate.md`). Task order and file ownership are yours.
 
 ## Output artifacts
 
@@ -132,7 +132,7 @@ Keep each task ID mapped to its brief path in this index, and show the absolute 
 When work reveals that scope, design, dependencies, or file ownership must change:
 1. Stop affected work and compare the observed issue with approved scope/design.
 2. Explain the change and any consequences; ask the user when approval boundaries or requirements change.
-3. Update the static plan/brief; when the change alters the approved summary or repository list, get the plan approved again. Preserve prior context when needed; do not destroy a user's unfinished work or infer approval from historical notes.
+3. Update the static plan/brief so it states the current plan; when the change adds a repository, get the plan approved again. Preserve prior context when needed; do not destroy a user's unfinished work or infer approval from historical notes.
 4. Reconcile the current native todo by readback, keeping it as the only mutable progress list. Do not create a migration board or mirror statuses.
 5. Reassign file ownership and order explicitly before workers resume.
 
