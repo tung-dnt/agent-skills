@@ -107,7 +107,7 @@ This is useful when you want to ensure a specific workflow is followed without w
 
 ## Slash Commands
 
-In this fork the lifecycle commands (`/spec`, `/plan`, `/build`, `/epic`, `/story`, `/task`, and the rest) ship only in Claude-command format under `.claude/commands/`, used by omp. Gemini CLI does not load them. Invoke the skills by name instead:
+In this fork the lifecycle commands (`/story`, `/task`, `/build`, and the rest) ship only in Claude-command format under `.claude/commands/`, used by omp. Gemini CLI does not load them. Invoke the skills by name instead:
 
 | Intent | Skill to invoke |
 |--------|-----------------|

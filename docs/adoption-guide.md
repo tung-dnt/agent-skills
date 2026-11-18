@@ -36,14 +36,14 @@ A new project is the best-case scenario: there's no legacy behavior to preserve,
 Run the lifecycle in order for the project's first real feature:
 
 ```text
-/spec   → approved requirements artifact
-/plan   → approved static plan + worker briefs + current-session native todo
-/build  → native task workers where useful; main-owned order and file ownership
+brief   → the lead writes goal, success criteria, boundaries and invariants
+/story  → one question batch, then one approved plan
+/build  → native task workers inside hard gates and the repo fence; main-owned order and file ownership
 /review → before every merge
 /ship   → when going live
 ```
 
-Keep the spec, design, plan, and worker briefs as static artifacts at paths agreed with the user or already established by the repository. Native todo is the main session's only mutable progress list; do not create a task-status note, vault task store, or replacement project JSON board. A user gate approves scope/design; a task worker's completion does not prove tests passed. See the [Native Task Workflow](native-task-workflow.md) and [Working Across Sessions](getting-started.md#working-across-sessions) for the session-local limits.
+Keep the brief, plan, and worker briefs as static artifacts at paths agreed with the user or already established by the repository. Native todo is the main session's only mutable progress list; do not create a task-status note, vault task store, or replacement project JSON board. The lead approves one plan; the agent owns low-level design, and a task worker's completion does not prove tests passed. See the [Native Task Workflow](native-task-workflow.md) and [Working Across Sessions](getting-started.md#working-across-sessions) for the session-local limits.
 
 ### From the start, treat these as always-on
 
@@ -64,7 +64,7 @@ Keep the spec, design, plan, and worker briefs as static artifacts at paths agre
 
 ### Greenfield anti-patterns
 
-- **Skipping `/spec` because "it's just a prototype."** Prototypes become products. The spec is the cheapest artifact you'll ever write for this codebase.
+- **Skipping the brief because "it's just a prototype."** Prototypes become products. The brief is the cheapest artifact you'll ever write for this codebase.
 - **Loading all 28 skills into every session.** It wastes context and dilutes the ones that matter. Load by phase; let the host's native router or `using-agent-skills` route, but not both.
 - **Deferring observability until "there's something to observe."** Instrument as you build, retrofitting structured logging is a Path B problem you're choosing to create.
 
@@ -95,7 +95,7 @@ Goal: every area the agent will touch gets a safety net first.
 
 Goal: two-speed adoption, legacy code stays under the Phase 1–2 regime; **new features get the greenfield treatment**.
 
-- New feature in the old codebase? `/spec → /plan → /build → /review`. The spec's boundaries section is where you declare what legacy surface the feature may and may not touch.
+- New feature in the old codebase? Write the brief, then `/story → /build → /review`. The brief's boundaries section is where you declare what legacy surface the feature may and may not touch.
 - **`api-and-interface-design` at the seams.** When new code must talk to old code, design the boundary contract-first. Hyrum's Law is not theoretical in a years-old codebase, someone depends on every observable behavior, including the bugs.
 - **`security-and-hardening` as an audit, then a gate.** Run it once across the existing attack surface (auth, input handling, dependencies, the dependency audit alone usually pays for the exercise), file what you find, then enforce it on new changes.
 
@@ -117,13 +117,13 @@ Goal: two-speed adoption, legacy code stays under the Phase 1–2 regime; **new 
 
 ## The two paths converge
 
-Both end in the same steady state: `/spec → /plan → /build → /review → /ship` for new work, always-on TDD and git discipline, review gates before merge, and skills loaded by phase rather than in bulk. Greenfield gets there in days; brownfield gets there in a quarter, and the difference is exactly the safety nets (context, characterization tests, boundaries) that the old codebase never had.
+Both end in the same steady state: `/story → /build → /review → /ship` for new work, always-on TDD and git discipline, review gates before merge, and skills loaded by phase rather than in bulk. Greenfield gets there in days; brownfield gets there in a quarter, and the difference is exactly the safety nets (context, characterization tests, boundaries) that the old codebase never had.
 
 |                        | Greenfield                     | Brownfield                               |
 | ---------------------- | ------------------------------ | ---------------------------------------- |
-| First skill loaded     | Native router, or `using-agent-skills` + `/spec` | `context-engineering`                    |
-| First value delivered  | Spec'd, tested first feature   | Zero-risk reviews and safer bug fixes    |
+| First skill loaded     | Native router, or `using-agent-skills` + `/story` | `context-engineering`                    |
+| First value delivered  | Briefed, tested first feature  | Zero-risk reviews and safer bug fixes    |
 | TDD posture            | Universal from commit one      | Selective: tests where change is planned |
 | Refactoring rule       | Rare (little to refactor)      | Characterization tests first, always     |
-| Riskiest anti-pattern  | Skipping the spec              | Refactoring untested code                |
+| Riskiest anti-pattern  | Skipping the brief             | Refactoring untested code                |
 | Time to full lifecycle | Day one                        | ~One quarter, two-speed in between       |

@@ -45,16 +45,16 @@ agy plugin list
 
 ## Lifecycle Workflows and Command Compatibility
 
-In this fork the lifecycle slash commands (`/spec`, `/plan`, `/build`, `/epic`, `/story`, `/task`, and the rest) ship only in Claude-command format under `.claude/commands/`, used by omp. There are no Gemini/Antigravity TOML wrappers, so on Antigravity the skills are invoked by name.
+In this fork the lifecycle slash commands (`/story`, `/task`, `/build`, and the rest) ship only in Claude-command format under `.claude/commands/`, used by omp. There are no Gemini/Antigravity TOML wrappers, so on Antigravity the skills are invoked by name.
 
 Use the native plugin skills directly:
 
 | Lifecycle command (omp) | Direct Antigravity invocation | Notes |
 |------------------|-------------------------------|-------|
-| `/spec` | `/agent-skills:spec-driven-development` | Writes a structured spec before code |
+| `/story` | `/agent-skills:planning-and-task-breakdown` | Method only: the lead's brief and the one plan approval need the omp-starter harness |
 | `/constraints` | `/agent-skills:constraint-driven-development` | Defines and enforces the project's quality bar |
-| `/planning` | `/agent-skills:planning-and-task-breakdown` | Antigravity's built-in `/planning` command is a separate plan-mode control |
-| `/build` | `/agent-skills:incremental-implementation` | Also invoke `/agent-skills:test-driven-development`; wrapper-only `/build auto` orchestration is unavailable |
+| `/task` | `/agent-skills:test-driven-development` | The focused change, test-first; hard gates need the omp-starter harness |
+| `/build` | `/agent-skills:incremental-implementation` | Also invoke `/agent-skills:test-driven-development`; wrapper-only orchestration (native task workers, hard gates, repo fence) is unavailable |
 | `/test` | `/agent-skills:test-driven-development` | Runs the red-green-refactor workflow |
 | `/review` | `/agent-skills:code-review-and-quality` | Runs the five-axis review workflow |
 | `/code-simplify` | `/agent-skills:code-simplification` | Simplifies without changing behavior |

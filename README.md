@@ -5,7 +5,8 @@
 Skills encode the workflows, quality gates, and best practices that senior engineers use when building software. These ones are packaged so AI agents follow them consistently across every phase of development.
 
 > **This is a fork** of [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills), maintained at [tung-dnt/agent-skills](https://github.com/tung-dnt/agent-skills). It adds:
-> - high- and low-level design skills with explicit requirements, contract, and user-approval workflows
+> - a lead-driven workflow: you write a brief, the agent asks its questions in one batch, you approve one plan, and the build runs inside hard gates and a repository fence
+> - high- and low-level design skills as method skills
 > - a native-first task workflow: native todo is the main session's progress list, native task runs workers, and static artifacts carry the handoff
 > - verification evidence for registered work without advertising unregistered work as hard-verified
 >
@@ -18,10 +19,10 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 ```
   DEFINE          PLAN           BUILD          VERIFY         REVIEW          SHIP
  ┌──────┐      ┌──────┐      ┌──────┐      ┌──────┐      ┌──────┐      ┌──────┐
- │ Idea │ ───▶ │ Spec │ ───▶ │ Code │ ───▶ │ Test │ ───▶ │  QA  │ ───▶ │  Go  │
- │Refine│      │  PRD │      │ Impl │      │Debug │      │ Gate │      │ Live │
+ │Brief │ ───▶ │ Plan │ ───▶ │ Code │ ───▶ │ Test │ ───▶ │  QA  │ ───▶ │  Go  │
+ │ Lead │      │ Once │      │ Impl │      │Debug │      │ Gate │      │ Live │
  └──────┘      └──────┘      └──────┘      └──────┘      └──────┘      └──────┘
-  /spec          /plan          /build        /test         /review       /ship
+  (lead)         /story         /build        /test         /review       /ship
                               /resume
 ```
 
@@ -35,17 +36,14 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 
 ## Commands
 
-14 slash commands that map to the development lifecycle. Each one activates the right skills automatically.
+11 slash commands that map to the development lifecycle. Each one activates the right skills automatically.
 
 | What you're doing | Command | Key principle |
 |-------------------|---------|---------------|
-| Plan an epic or a new project | `/epic` | Intent, requirements, architecture, story map |
-| Take a story through an approved plan | `/story` | Requirements → design → static plan |
-| Build one task end to end | `/task` | User gate → approved LLD for every planned task → test-first build → review |
+| Take a story from the lead's brief to one approved plan | `/story` | Brief → one question batch → one plan approval |
+| Build one focused change | `/task` | Pairing mode: test-first, hard gates still enforced |
 | Stress-test a plan or decision | `/grill-me` | Settle every branch before acting |
-| Define what to build | `/spec` | Spec before code |
-| Plan how to build it | `/plan` | Small, ordered worker briefs |
-| Build incrementally | `/build` | Main owns order and file ownership; native task workers execute |
+| Build an approved story | `/build` | Main owns order and file ownership; native task workers execute inside the fences |
 | Resume available work | `/resume` | Current native session + accessible static artifacts |
 | Prove it works | `/test` | Tests are proof |
 | Set the quality bar | `/constraints` | Decide it once, enforce it everywhere |
@@ -56,7 +54,7 @@ Skills encode the workflows, quality gates, and best practices that senior engin
 
 In Claude Code these install as plugin commands. Where a built-in command has the same name, as `/review` does, use the namespaced form: `/agent-skills:review`.
 
-`/build` implements approved work using native task workers when useful. The main session owns the current native todo, user gates, task order, and exact file ownership. Every worker receives static artifact paths and explicit acceptance criteria; workers run focused checks, and one main integration owner runs required full, integration, and runtime checks at stable boundaries. See [docs/native-task-workflow.md](docs/native-task-workflow.md).
+`/build` implements approved work using native task workers when useful. The main session owns the current native todo, task order, and exact file ownership; the plan's repository list and the hard gates are enforced by the harness. Every worker receives static artifact paths and explicit acceptance criteria; workers run focused checks, and one main integration owner runs required full, integration, and runtime checks at stable boundaries. See [docs/native-task-workflow.md](docs/native-task-workflow.md).
 
 Skills also activate automatically based on what you're doing — designing an API triggers `api-and-interface-design`, building UI triggers `frontend-ui-engineering`, and so on.
 
@@ -66,39 +64,37 @@ Skills also activate automatically based on what you're doing — designing an A
 
 ### A workflow for each scope of work
 
-`/epic`, `/story`, `/task`, `/build`, and `/resume` combine explicit user gates with native progress and static artifact handoffs:
+You are the lead: you write a brief at `lead/stories/<id>/brief.md` in your knowledge base (the omp-starter `/starter lead` command creates the template, a system map and the hard-gates file). `/story`, `/task`, `/build`, and `/resume` then run with one plan approval, native progress, and static artifact handoffs:
 
 ```mermaid
 flowchart TD
-    R[Request] --> SC{Scope check}
-    SC -->|epic| E[Requirements → architecture → ordered story map]
-    SC -->|story| S[Approved requirements → design/contracts → static plan]
-    SC -->|task| T[Approved brief/design → focused implementation]
-    E --> S
-    S --> T
-    T --> W[Native task worker when useful]
-    W --> I[Main reviews actual changes and runs required integration checks]
+    L["Lead brief + system map"] --> S["/story: one question batch → plan → one approval"]
+    S --> B["/build: native task workers inside hard gates and the repo fence"]
+    R[Request] --> T["/task: one focused change, pairing mode, test-first"]
+    B --> I[Main reviews actual changes and runs required integration checks]
+    T --> I
     I --> D[Main updates native todo based on observed results]
+    D --> P["/ship: PR with decision log, invariant checklist, risk summary"]
 ```
 
 | Phase | Main artifact/progress | Approval/evidence |
 |---|---|---|
-| Requirements | Static spec with testable `FR`/`NFR` criteria | Explicit user gate |
-| Design | Static architecture/contracts with stable IDs | Explicit user gate and fresh-context critique where required |
-| Plan | Static ordered plan and bounded worker briefs | Explicit user gate |
-| Execution | Native todo for this main session; native task for worker execution | Worker output is not test proof |
+| Brief | Lead's goal, success criteria, boundaries, invariants | Written by the lead; `/story` does not start without it |
+| Plan | Plan file: `repos:`, a `## Summary` of at most 15 lines, ordered tasks | One approval through the `lead` tool; a new repository or an edit to the brief's invariants needs it again |
+| Execution | Native todo for this main session; native task for worker execution | Hard gates on risky paths and the repo fence are enforced by the harness; worker output is not test proof |
 | Verification | Candidate-scoped receipts for registered work | `begin`, `run`, `status`, `complete`, `cancel`; approval remains user-facing |
 | Integration | Main-owned required full, integration, and runtime/browser checks | Report only observed results |
+| PR | Decision log, invariant checklist, risk summary | The harness checks the PR body against `lead/pr-format.md` |
 
-**Every planning/design gate** follows [references/approval-gate.md](references/approval-gate.md): show a catch-up summary and the relevant artifact, grill open decisions, then wait for explicit user approval. Do not treat a todo item, task completion, imported note, or model argument as approval.
+**One plan approval.** [references/approval-gate.md](references/approval-gate.md): the agent asks every question in one batch, writes the plan, and calls the `lead` tool, which shows it to you in a dialog only you can answer. There is no spec gate, design gate, or per-task design approval. Do not treat a todo item, task completion, imported note, or model argument as approval.
 
 **What makes the handoff reliable:**
 - **One mutable progress owner.** The main session uses native todo; no Markdown task-status copy, vault task store, or replacement project JSON board is created.
-- **Static context.** Specs, designs, plans, decisions, and worker briefs are passed by absolute path. They are not edited as a second progress tracker.
+- **Static context.** The brief, system map, hard gates, plan, and worker briefs are passed by absolute path. They are not edited as a second progress tracker.
 - **Main-owned coordination.** The main session chooses order, dependencies, and one owner per shared file. There is no project-wide claim, lock, automatic DAG readiness, or conflict-detection guarantee.
-- **Bounded workers.** Native task execution receives one approved task and explicit allowed paths, runs focused checks, and reports exact evidence and unrun checks.
-- **Per-task design gate.** Every task from a written plan gets a user-approved low-level design before code, even if mechanical; concise notes and explicit repo-slice approvals are allowed, silent skips are not.
-- **User-only approval.** Policy/scope approval is obtained through the supported user-facing interaction, never a model-supplied flag.
+- **Bounded workers.** Native task execution receives one task from the approved plan and explicit allowed paths, runs focused checks, and reports exact evidence and unrun checks.
+- **Agent-owned design.** The agent decides low-level design and records each non-trivial choice with the rejected alternative in the decision log. The harness stops work only at hard gates on risky paths.
+- **User-only approval.** Plan and hard-gate approvals are dialogs only the user can answer, never a model-supplied flag.
 - **Evidence is distinct.** Registered work uses the verification interface; `complete` records evidence and does not set todo progress. Native task completion is not proof. Unregistered work is not advertised as hard-verified.
 - **Honest resume.** `/resume` uses current native session state, accessible worker output, static artifacts, and repository state; it cannot promise recovery of another session's checklist or ownership.
 - **Quality gates remain.** Workers run focused checks. The main integration owner runs required full-suite and project-required runtime checks at stable boundaries without waiving quality criteria.
@@ -238,7 +234,7 @@ See [docs/opencode-setup.md](docs/opencode-setup.md).
 <details>
 <summary><b>GitHub Copilot</b></summary>
 
-Use agent definitions from `agents/` as Copilot personas and skill content in `.github/copilot-instructions.md`. The lifecycle slash commands (`/spec`, `/plan`, `/build`, `/test`, `/review`, `/ship`) are Claude Code commands and do not appear in Copilot; invoke the skills by name (`/spec-driven-development`, …) instead. See [docs/copilot-setup.md](docs/copilot-setup.md).
+Use agent definitions from `agents/` as Copilot personas and skill content in `.github/copilot-instructions.md`. The lifecycle slash commands (`/story`, `/build`, `/test`, `/review`, `/ship`) are Claude Code commands and do not appear in Copilot; invoke the skills by name (`/spec-driven-development`, …) instead. See [docs/copilot-setup.md](docs/copilot-setup.md).
 
 Using the standalone `copilot` CLI? Install it as a plugin — see [docs/copilot-cli-setup.md](docs/copilot-cli-setup.md).
 

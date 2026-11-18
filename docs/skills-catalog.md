@@ -23,7 +23,7 @@ The commands above are entry points. The pack includes 28 skills total — 27 li
 
 | Skill | What It Does | Use When |
 |-------|-------------|----------|
-| [high-level-design](../skills/high-level-design/SKILL.md) | Turn approved requirements into a system shape (components, flows, data ownership, NFR mechanisms) and the shared contracts tasks depend on | A story or feature adds or reshapes components, or several tasks will share a contract |
+| [high-level-design](../skills/high-level-design/SKILL.md) | Turn requirements into a system shape (components, flows, data ownership, NFR mechanisms) and the shared contracts tasks depend on | A story or feature adds or reshapes components, or several tasks will share a contract |
 | [planning-and-task-breakdown](../skills/planning-and-task-breakdown/SKILL.md) | Decompose specs into small, verifiable tasks with acceptance criteria and dependency ordering | You have a spec and need implementable units |
 
 ### Build - Write the code
@@ -98,6 +98,6 @@ Quick-reference material that skills pull in when needed:
 | [accessibility-checklist.md](../references/accessibility-checklist.md) | Keyboard nav, screen readers, visual design, ARIA, testing tools |
 | [observability-checklist.md](../references/observability-checklist.md) | On-call questions, structured logging, RED/USE metrics, tracing, symptom-based alerting, pre-launch gate |
 | [orchestration-patterns.md](../references/orchestration-patterns.md) | Endorsed multi-persona orchestration patterns, anti-patterns, and the "personas don't invoke personas" rule |
-| [work-artifacts.md](../references/work-artifacts.md) | Per-story layout, task notes, the git-lock claim protocol, store resolution (vault or repo), progress view, and resuming |
-| [approval-gate.md](../references/approval-gate.md) | The one gate before work starts: catch-up summary format, `grill-me` rounds, explicit go-ahead, and where each gate sits |
+| [work-artifacts.md](../references/work-artifacts.md) | The handoff contract: one progress owner, the command map, static artifacts, approval and verification, and build and integration ownership |
+| [approval-gate.md](../references/approval-gate.md) | What the lead approves (the one plan, hard gates), how the approval is recorded, and how it differs from verification |
 | [model-routing.md](../references/model-routing.md) | Model tiers, what gets delegated at each scope, the subagent output contract, parallel fan-out, and escalation |

@@ -8,7 +8,7 @@ Specialist personas that play a single role with a single perspective. Each pers
 | [security-auditor](../agents/security-auditor.md) | Security Engineer | Vulnerability detection, OWASP-style audit |
 | [test-engineer](../agents/test-engineer.md) | QA Engineer | Test strategy, coverage analysis, Prove-It pattern |
 | [web-performance-auditor](../agents/web-performance-auditor.md) | Web Performance Engineer | Core Web Vitals audit, loading/rendering/network analysis |
-| [task-builder](../agents/task-builder.md) | Implementer | Building one main-assigned, user-approved task from static artifacts and reporting focused evidence |
+| [task-builder](../agents/task-builder.md) | Implementer | Building one main-assigned task from an approved plan or a pairing request and reporting focused evidence |
 | [state-investigator](../agents/state-investigator.md) | Read-only investigator | Comparing accessible native session state, static artifacts, worker output, and repository state for `/resume` |
 
 ## How personas relate to skills and commands

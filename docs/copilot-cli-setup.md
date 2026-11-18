@@ -40,7 +40,7 @@ In an interactive session, `/skills list` shows the same catalog.
 The root `plugin.json` is the manifest Copilot CLI reads — it takes precedence over `.claude-plugin/plugin.json`, which belongs to Claude Code. That root manifest declares only a name, version and description, so component paths fall back to their defaults:
 
 - **Skills — available.** With no explicit path, the CLI uses the conventional `skills/` directory, and the skills are discovered there.
-- **Lifecycle commands — not available.** The root manifest has no `commands` field, so nothing registers `/spec`, `/plan`, `/build`, `/test`, `/review` or `/ship`. Those files live in `.claude/commands/` and are Claude Code commands.
+- **Lifecycle commands — not available.** The root manifest has no `commands` field, so nothing registers `/story`, `/build`, `/test`, `/review` or `/ship`. Those files live in `.claude/commands/` and are Claude Code commands.
 
 For manifest precedence and the per-component path defaults, see the [CLI plugin reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference) and [Creating plugins](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/plugins-creating).
 
@@ -60,5 +60,5 @@ Name the skill you want, or describe the task and let the agent route to it:
 |---------|---------------|
 | `plugin install` can't resolve `agent-skills@addy-agent-skills` | Run `copilot plugin marketplace add addyosmani/agent-skills` first — that name only resolves once the marketplace is registered. Or install the repository directly. |
 | Plugin installed but no skills | `copilot plugin list` to confirm the plugin, then `copilot skill list` (or `/skills list` in session) to see what was discovered. |
-| `/spec`, `/build` and friends are not found | Expected, not a broken install: the root manifest registers no commands. Ask for the skill by name instead. |
+| `/story`, `/build` and friends are not found | Expected, not a broken install: the root manifest registers no commands. Ask for the skill by name instead. |
 | Skills changed locally but the CLI shows the old copy | Start a fresh session, or run with `--plugin-dir` pointing at your clone. |

@@ -2,9 +2,9 @@
 
 This guide covers Copilot in VS Code. For the standalone `copilot` command-line tool, see [copilot-cli-setup.md](copilot-cli-setup.md).
 
-**What an install actually gives you:** the skills. Each installed skill becomes a slash command named after its frontmatter `name` — `/spec-driven-development`, `/test-driven-development`, and so on. `npx skills add addyosmani/agent-skills` and the manual copy below both install skills only. Neither of those two routes copies this repo's short lifecycle wrappers (`/spec`, `/plan`, `/build`, `/test`, `/review`, `/ship`) — those are Claude Code commands living in `.claude/commands/`. Use the full skill names, or add your own aliases — see [Lifecycle workflows](#lifecycle-workflows).
+**What an install actually gives you:** the skills. Each installed skill becomes a slash command named after its frontmatter `name` — `/spec-driven-development`, `/test-driven-development`, and so on. `npx skills add addyosmani/agent-skills` and the manual copy below both install skills only. Neither of those two routes copies this repo's short lifecycle wrappers (`/story`, `/build`, `/test`, `/review`, `/ship`) — those are Claude Code commands living in `.claude/commands/`. Use the full skill names, or add your own aliases — see [Lifecycle workflows](#lifecycle-workflows).
 
-> **`/spec`, `/plan`, `/build`, `/test`, `/review`, `/code-simplify`, `/webperf` and `/ship` never appear in Copilot.** They are Claude Code commands, and Copilot does not read `.claude/commands/`. Not seeing them after an install is expected, not a missing step. Invoke the skill by its own name instead — `/spec-driven-development` for `/spec`, `/planning-and-task-breakdown` for `/plan`, and so on; the full mapping is in [Lifecycle Workflows](#lifecycle-workflows). On VS Code you can add [short aliases](#optional-short-spec-style-aliases) yourself if you want the short forms.
+> **`/story`, `/task`, `/build`, `/test`, `/review`, `/code-simplify`, `/webperf` and `/ship` never appear in Copilot.** They are Claude Code commands, and Copilot does not read `.claude/commands/`. Not seeing them after an install is expected, not a missing step. Invoke the skill by its own name instead — `/planning-and-task-breakdown` for `/story`, `/incremental-implementation` for `/build`, and so on; the full mapping is in [Lifecycle Workflows](#lifecycle-workflows). On VS Code you can add [short aliases](#optional-short-command-aliases) yourself if you want the short forms.
 
 ## Setup
 
@@ -108,54 +108,51 @@ Natural language is the fallback, and works in any Copilot surface whether or no
 
 > Use the code-review-and-quality skill to review my staged changes.
 
-### Optional: short `/spec`-style aliases
+### Optional: short command aliases
 
 VS Code's extension-host local agents support [prompt files](https://code.visualstudio.com/docs/agent-customization/prompt-files) at `.github/prompts/<name>.prompt.md`, and each becomes a `/<name>` slash command. The Agent Host does **not** use prompt files — there, use the skill names above.
 
-An alias is a thin shortcut to a skill, not an orchestration or state-transport feature. These prompt files do not add OMP's native task or verification tools; use only capabilities the active host actually exposes. Never imply cross-session claims, automatic dependency readiness, or project-wide resume.
+An alias is a thin shortcut to a skill, not an orchestration or state-transport feature. These prompt files do not add OMP's native task or verification tools, the lead harness, or hard gates; use only capabilities the active host actually exposes. Never imply cross-session claims, automatic dependency readiness, or project-wide resume.
 
 Create one, without clobbering an existing file:
 
 ```bash
 mkdir -p .github/prompts
-[ -e .github/prompts/spec.prompt.md ] || cat > .github/prompts/spec.prompt.md <<'EOF'
+[ -e .github/prompts/test.prompt.md ] || cat > .github/prompts/test.prompt.md <<'EOF'
 ---
-description: Write a structured spec before writing code
+description: Write tests before the code that satisfies them
 ---
 
-Use the spec-driven-development skill.
+Use the test-driven-development skill.
 
-Ask clarifying questions about the objective and target users, core features and
-acceptance criteria, stack preferences and constraints, and known boundaries.
-Then write a spec covering objective, commands, project structure, code style,
-testing strategy, and boundaries. Save it as SPEC.md in the project root and
-confirm with me before any code is written.
+For new behavior, write a failing test that captures it before any implementation.
+For a bug, reproduce it with a failing test first, then fix it. Run the suite
+after each step and show me the red and the green output.
 EOF
 ```
 
-Reload the window, then type `/spec`.
+Reload the window, then type `/test`.
 
-For the rest, run the same `mkdir`/`cat` block with the filename swapped (the filename *is* the command name), and take the `description` and body from this table. **Replace the entire body below the `---` frontmatter**, not just the skill name — the spec body's SPEC.md and clarifying-question instructions belong to Define only, and leaving them in would make `/plan` or `/test` write a spec.
+For the rest, run the same `mkdir`/`cat` block with the filename swapped (the filename *is* the command name), and take the `description` and body from this table. **Replace the entire body below the `---` frontmatter**, not just the skill name, so one alias's instructions do not leak into another.
 
 | Alias file | `description` | Complete body — everything below the frontmatter |
 |------------|---------------|--------------------------------------------------|
-| `.github/prompts/plan.prompt.md` | Break approved requirements into ordered, verifiable work | Use the planning-and-task-breakdown skill. Read the approved requirements, relevant design, and code. Write a static plan at a path agreed with the user and one static worker brief per task with acceptance criteria, dependencies, exact owned paths, and focused verification. Do not write product code, create `_tasks` notes or a project task store, call `work_state`, or claim project-wide readiness. Show the plan and wait for explicit user approval. |
-| `.github/prompts/build.prompt.md` | Implement one approved task, test-first | Use the incremental-implementation, low-level-design, and test-driven-development skills. For every task from a written plan, write and obtain explicit user approval for its LLD before code, even if the change looks mechanical; concise notes or a user-approved slice gate showing every design are allowed. Read the exact approved static brief path; implement only the bounded task and allowed files. Run focused checks and report exact commands/results plus required full/integration/runtime checks not run. The main session owns task order, shared-file ownership, user gates, and integration. Do not write task status to a separate board or treat native task completion as test proof. |
-| `.github/prompts/test.prompt.md` | Write tests before the code that satisfies them | Use the test-driven-development skill. For new behavior, write a failing test that captures it before any implementation. For a bug, reproduce it with a failing test first, then fix it. Run the suite after each step and show me the red and the green output. |
+| `.github/prompts/story.prompt.md` | Plan one story from a brief | Use the planning-and-task-breakdown skill. Read the brief and the relevant code. Ask every open question in one batch, then write a static plan at a path agreed with the user and one static worker brief per task with acceptance criteria, dependencies, exact owned paths, and focused verification. Do not write product code, create `_tasks` notes or a project task store, call `work_state`, or claim project-wide readiness. Show the plan and wait for explicit user approval. |
+| `.github/prompts/build.prompt.md` | Implement one task from an approved plan, test-first | Use the incremental-implementation and test-driven-development skills, plus low-level-design when the task has real decisions. Read the exact static brief path; decide the task's design yourself, record each non-trivial choice with the rejected alternative, and implement only the bounded task and allowed files. Run focused checks and report exact commands/results plus required full/integration/runtime checks not run. The main session owns task order, shared-file ownership, and integration. Do not write task status to a separate board or treat native task completion as test proof. |
 
 Write the body yourself, or take it from this table, rather than copying `.claude/commands/*.md` verbatim: those files reference skills as `agent-skills:<name>`, a Claude Code plugin namespace that means nothing to Copilot.
 
 ### If the skill slash commands don't appear
 
-First rule out the expected case: if the only commands you miss are the short lifecycle wrappers (`/spec`, `/plan`, `/build`, `/test`, `/review`, `/ship`), nothing is wrong — those are Claude Code commands and never surface in Copilot (see the note at the top). The steps below are for when the skills' own names, such as `/spec-driven-development`, are missing too.
+First rule out the expected case: if the only commands you miss are the short lifecycle wrappers (`/story`, `/build`, `/test`, `/review`, `/ship`), nothing is wrong — those are Claude Code commands and never surface in Copilot (see the note at the top). The steps below are for when the skills' own names, such as `/spec-driven-development`, are missing too.
 
-Work through these in order — `/spec-driven-development` missing and `/spec` missing have different causes:
+Work through these in order — `/spec-driven-development` missing and `/story` missing have different causes:
 
 1. **Check where the skills landed.** Each one needs its own directory containing a `SKILL.md`. The project-level paths this guide uses are `.github/skills/`, `.claude/skills/` and `.agents/skills/` — but an installer run with a global/user flag writes outside the workspace instead (`~/.agents/skills/` and equivalents), so a skill that isn't in any of the three may simply be installed personally. Confirm the actual path against the [VS Code agent skills docs](https://code.visualstudio.com/docs/agent-customization/agent-skills), then re-install into the project if you wanted it project-scoped.
 2. **Check the frontmatter.** `name` must be present and valid — it *is* the slash command. A skill whose frontmatter opts out of user invocation won't appear.
 3. **Check the Configure Skills menu.** Run `/skills` and confirm the skill is enabled here.
 4. **Start a fresh session.** Newly added skills aren't always picked up mid-conversation.
-5. **Check the host.** If `/spec-driven-development` works but your `/spec` alias doesn't, you're likely on the Agent Host, which doesn't read prompt files.
+5. **Check the host.** If `/spec-driven-development` works but your `/test` alias doesn't, you're likely on the Agent Host, which doesn't read prompt files.
 6. **Check versions.** VS Code (**Help → About**) and the Copilot Chat extension; skills-as-slash-commands is recent, so update if either is behind.
 
 ## Usage Tips

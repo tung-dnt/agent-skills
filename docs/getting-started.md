@@ -127,9 +127,9 @@ The `.claude/commands/` directory contains slash commands for Claude Code:
 
 | Command | Skill Invoked |
 |---------|---------------|
-| `/spec` | spec-driven-development |
+| `/story` | the lead's brief → one question batch → one approved plan (`planning-and-task-breakdown` as method) |
+| `/task` | test-driven-development |
 | `/constraints` | constraint-driven-development |
-| `/plan` | planning-and-task-breakdown |
 | `/build` | incremental-implementation + test-driven-development |
 | `/test` | test-driven-development |
 | `/review` | code-review-and-quality |
@@ -167,26 +167,25 @@ needed checklist into a `references/` directory inside the installed skill.
 This portability gap is tracked in
 [addyosmani/agent-skills#361](https://github.com/addyosmani/agent-skills/issues/361).
 
-## Specs, plans, and task artifacts
+## Briefs, plans, and task artifacts
 
-`/spec` and `/plan` produce static requirements, designs, plans, and worker briefs at paths chosen by the user or established by the repository. These artifacts carry acceptance criteria, decisions, dependencies, exact file ownership, and verification expectations. They do not store mutable task status. The main session uses native todo as its only progress list and native task for worker execution; it does not require an Obsidian vault, `_tasks` directory, work-state tool, or replacement project JSON store. See [Work Artifacts and Native Progress](../references/work-artifacts.md) and the [Native Task Workflow](native-task-workflow.md).
+The lead writes the brief at `lead/stories/<id>/brief.md` in the knowledge base; `/story` produces the plan file with the repositories, a short summary, ordered tasks, and a decision log. These artifacts carry acceptance criteria, invariants, decisions, dependencies, exact file ownership, and verification expectations. They do not store mutable task status. The main session uses native todo as its only progress list and native task for worker execution; it does not require a `_tasks` directory, work-state tool, or replacement project JSON store. See [Work Artifacts and Native Progress](../references/work-artifacts.md) and the [Native Task Workflow](native-task-workflow.md).
 
 - Keep static artifacts where they can be reviewed and handed to a worker by absolute path.
-- Update them only when scope/design changes; use the user gate before proceeding on a changed decision.
+- The agent keeps the plan file current as the approach changes; the lead's brief changes only through the lead.
 - Never add task status, claim data, or worker logs to a second Markdown/JSON board.
 
 ### Working by scope
 
-- `/epic [id or idea]`: clarify intent → requirements → architecture when needed → ordered story map.
-- `/story [work-id]`: approved requirements → high-level design/contracts when needed → static task plan and briefs.
-- `/task [work-id]`: one focused task → approved low-level design for every planned task (concise even when mechanical) → test-first implementation and review; only ad-hoc mechanical changes with no decisions may omit LLD.
-- `/build [work-id]`: every planned task's approved LLD gate → main-owned order/file ownership → native task workers as useful.
+- `/story <id>`: read the lead's brief and system map → one batch of questions → plan (repos, summary, tasks) → one approval through the `lead` tool.
+- `/build <id>`: main-owned order/file ownership → native task workers as useful, inside the hard gates and the plan's repository list.
+- `/task`: one focused change in pairing mode → test-first implementation and review.
 
-Every nontrivial requirements, design, and plan phase uses the approval gate ([references/approval-gate.md](../references/approval-gate.md)): show the artifact and a concise catch-up summary, grill unresolved decisions, and wait for an explicit user go-ahead. In addition, every task in a written breakdown has an approved low-level design before code, including mechanical tasks; the note may be concise and a user-approved slice may cover several designs. A native todo, native task completion, imported note, or model argument is not approval. A genuinely ad-hoc mechanical change with no design decisions may omit LLD. The user-facing approval interaction cannot be replaced by `approved=true`.
+`/story` needs the omp-starter lead harness (`/starter lead` creates the brief template, system map and hard-gates file). The only planning approval is the plan, through the `lead` tool ([references/approval-gate.md](../references/approval-gate.md)); there is no spec, design, or per-task design approval. The agent owns low-level design and records each non-trivial choice in the decision log. A native todo, native task completion, imported note, or model argument is not approval. The user-facing approval interaction cannot be replaced by `approved=true`.
 
 ### Working across sessions
 
-Static specs, designs, plans, and worker briefs can be handed between sessions by path, but native todo/task state is session-scoped. Do not assume another session can see the same native checklist, worker output, ordering, or ownership. The main session coordinates directly with any other owner before shared-file edits.
+The brief, plan, and worker briefs can be handed between sessions by path, but native todo/task state is session-scoped. Do not assume another session can see the same native checklist, worker output, ordering, or ownership. The main session coordinates directly with any other owner before shared-file edits.
 
 At a boundary, record the next decision/context in the relevant static artifact if it is part of the approved design, then tell the user the exact next command and which checks remain. Keep verification evidence separate from progress: report the exact check command, candidate, and observed result. Re-run checks when the candidate moved or evidence is missing/stale.
 

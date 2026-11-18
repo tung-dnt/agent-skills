@@ -1,27 +1,27 @@
 # Native Task Workflow
 
-This repository's omp workflow uses native todo for the current main session's progress and native task for worker execution, output, cancellation, and revival. One main session owns ordering, task selection, user approval, and explicit file ownership. Static requirements, designs, plans, decisions, and worker briefs are handed to workers by absolute path; they do not mirror mutable status.
+This repository's omp workflow uses native todo for the current main session's progress and native task for worker execution, output, cancellation, and revival. One main session owns ordering, task selection, the plan approval, and explicit file ownership. The lead's brief, the plan, and worker briefs are handed to workers by absolute path; they do not mirror mutable status.
 
 ## Do / Don't
 
 | Do | Don't |
 |---|---|
 | Use native todo as the one mutable progress list for the active main session. | Create an `_tasks` status board, task-state JSON store, Obsidian task store, or second progress checklist. |
-| Write a static spec/design/plan/worker brief at a user-approved path. | Store `todo`/`done`, active status, or worker logs in static artifacts. |
+| Write a static plan/worker brief at a path the user or repository established. | Store `todo`/`done`, active status, or worker logs in static artifacts. |
 | Have the main session choose task order and one owner per shared file. | Claim global DAG readiness, automatic path-conflict detection, or cross-session locks. |
 | Delegate one bounded task through the native task mechanism with a brief path, acceptance criteria, and allowed files. | Treat task completion or a worker report as proof that tests passed or code was reviewed. |
-| Require an approved low-level design for every task from a written plan, including mechanical tasks; use a concise note or explicit user-approved slice gate. | Skip the LLD gate because the planned task “looks trivial.” |
+| Decide each task's low-level design yourself and record each non-trivial choice with the rejected alternative in the decision log. | Ask the lead to approve a task design, or route around a hard gate with a shell write. |
 | Keep approvals in the user-facing gate; keep registered evidence in the supported verification binding/receipt metadata. | Pass a model approval flag or infer approval from a native todo item, worker status, or imported note. |
 | Run focused checks while implementing; let one integration owner run required full checks at a stable boundary. | Run duplicate full suites in every worker or lower the repository quality bar. |
 | Read back native todo after manual edits/rewind when a protected transition is uncertain. | Reconstruct unavailable state from unrelated Markdown, branches, or another session's claims. |
 
 ## Planning and handoff
 
-Use `/epic` for a product/capability map, `/story` for one feature's requirements/design/plan, `/plan` for a task breakdown, `/task` for one focused change, and `/build` for approved implementation. See [Work Artifacts and Native Progress](../references/work-artifacts.md) for the shared contract and [Approval Gate](../references/approval-gate.md) for user-only approval rules.
+Use `/story <id>` for one story from the lead's brief (one question batch, one approved plan), `/task` for one focused change in pairing mode, and `/build <id>` for the approved plan. See [Work Artifacts and Native Progress](../references/work-artifacts.md) for the shared contract and [Approval Gate](../references/approval-gate.md) for user-only approval rules.
 
 The plan is a static index. Each worker brief names:
 
-- stable work ID and approved scope/design references;
+- stable work ID and the brief/plan references;
 - concrete acceptance criteria and non-goals;
 - explicit prerequisite/order information;
 - exact allowed file paths and the main-assigned owner for shared paths;
@@ -29,20 +29,20 @@ The plan is a static index. Each worker brief names:
 
 The main session copies the agreed phase/task outline into the current native todo and assigns workers. Native todo/task state is session-scoped; it is not a repository-wide backlog or a distributed ownership mechanism. If another session is working on the same project, coordinate with its owner directly before overlapping edits.
 
-Before a native task worker starts a task from a written breakdown, the main session ensures its static brief contains an approved low-level design. This applies to every planned task, including mechanical work; keep the note concise when appropriate. Obtain approval per task or by an explicitly approved repo-sized slice showing every included design. Only a genuinely ad-hoc mechanical change with no design decisions may omit LLD.
+The agent owns low-level design. For a task with real decisions, write a concise note in the plan file's `## Tasks` or `## Decision log`; nobody approves it. When a write stops at a hard gate, the worker reports `blocked: hard gate <id> <repo>/<path>` and the main session takes it to the lead through the `lead` tool.
 
 ## Viewing a task's requirements
 
-Keep a stable task ID mapped to its brief path in the static plan. The brief contains the task's objective, scope, acceptance criteria, requirement/contract references, approved LLD, and verification criteria. Native todo keeps only the current progress; it is not a rich task-details viewer.
+Keep a stable task ID mapped to its brief path in the static plan. The brief contains the task's objective, scope, acceptance criteria, requirement/contract references, design notes, and verification criteria. Native todo keeps only the current progress; it is not a rich task-details viewer.
 
-- To inspect a task, ask for its ID, such as “show requirements for T02.” Read its brief and the cited spec sections rather than searching the whole transcript.
+- To inspect a task, ask for its ID, such as “show requirements for T02.” Read its worker brief and the lead's brief sections it cites rather than searching the whole transcript.
 - Show the brief's absolute path in chat and the worker handoff so the user can open the file directly. Do not assume a native todo client renders a clickable attachment.
 - Owner-session `local://` artifacts can be used during that session and its resume. Context that must remain discoverable across sessions or machines belongs at a user-approved durable location, commonly Git-tracked repository documents.
-- “Static” means the artifact does not mirror progress. Requirements/design may be revised through the user gate; changed approved scope invalidates old verification evidence and must be rebound before completion.
+- “Static” means the artifact does not mirror progress. The brief changes only through the lead; the agent replaces plan lines as the approach changes, and a new repository in the plan needs the plan approved again. Changed approved scope invalidates old verification evidence and must be rebound before completion.
 
 ## Approval and verification
 
-Before implementation, the main session shows the design/plan, asks about open decisions, and waits for explicit user approval. The gate is a user-facing interaction. Never use a model-supplied `approved` flag or treat task completion as consent.
+The lead approves one plan per story through the `lead` tool, and hard gates stop writes to risky paths until the lead decides; both are user-facing dialogs. Never use a model-supplied `approved` flag or treat task completion as consent.
 
 The extension exposes the public `verification` tool and `/verification` command with `op` values `begin`, `run`, `status`, `complete`, and `cancel`. Tool arguments are one-level (`verification({op, workId, item?, scopeArtifact?, profile?, additionalChecks?, checkId?})`); `workId` is required for every operation. Do not pass arbitrary commands, receipts, nested argument objects, or model approval flags.
 
